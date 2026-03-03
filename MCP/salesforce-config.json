@@ -1,0 +1,8 @@
+{
+  "instanceUrl": "https://yourorg.my.salesforce.com",
+  "clientId": "YOUR_CONNECTED_APP_CLIENT_ID",
+  "clientSecret": "YOUR_CONNECTED_APP_CLIENT_SECRET",
+  "username": "your.user@company.com",
+  "password": "yourPassword",
+  "securityToken": "yourSecurityToken"
+}

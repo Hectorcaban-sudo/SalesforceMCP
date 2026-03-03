@@ -1,0 +1,128 @@
+{
+  "objectName": "Contact",
+  "label": "Contact",
+  "labelPlural": "Contacts",
+  "aliases": ["contacts", "person", "people", "individual"],
+  "fields": [
+    {
+      "fieldName": "Id",
+      "label": "Contact ID",
+      "type": "id",
+      "aliases": ["id", "contact id"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    },
+    {
+      "fieldName": "FirstName",
+      "label": "First Name",
+      "type": "string",
+      "aliases": ["first name", "first"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "LastName",
+      "label": "Last Name",
+      "type": "string",
+      "aliases": ["last name", "last", "surname", "family name"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Email",
+      "label": "Email",
+      "type": "email",
+      "aliases": ["email", "email address", "e-mail"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Phone",
+      "label": "Phone",
+      "type": "phone",
+      "aliases": ["phone", "phone number", "telephone", "tel"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "MobilePhone",
+      "label": "Mobile",
+      "type": "phone",
+      "aliases": ["mobile", "cell", "mobile phone", "cell phone"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Title",
+      "label": "Title",
+      "type": "string",
+      "aliases": ["title", "job title", "position", "role"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "AccountId",
+      "label": "Account",
+      "type": "reference",
+      "aliases": ["account", "company", "account id"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Department",
+      "label": "Department",
+      "type": "string",
+      "aliases": ["department", "dept", "division"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "MailingCity",
+      "label": "Mailing City",
+      "type": "string",
+      "aliases": ["city", "mailing city"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "MailingState",
+      "label": "Mailing State",
+      "type": "string",
+      "aliases": ["state", "mailing state", "province"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "CreatedDate",
+      "label": "Created Date",
+      "type": "datetime",
+      "aliases": ["created", "created date"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    }
+  ]
+}

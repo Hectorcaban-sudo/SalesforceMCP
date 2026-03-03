@@ -1,0 +1,138 @@
+{
+  "objectName": "Account",
+  "label": "Account",
+  "labelPlural": "Accounts",
+  "aliases": ["accounts", "company", "companies", "customer", "customers", "org"],
+  "fields": [
+    {
+      "fieldName": "Id",
+      "label": "Account ID",
+      "type": "id",
+      "aliases": ["id", "account id"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    },
+    {
+      "fieldName": "Name",
+      "label": "Account Name",
+      "type": "string",
+      "aliases": ["account name", "name", "company name"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Phone",
+      "label": "Phone",
+      "type": "phone",
+      "aliases": ["phone number", "telephone", "tel"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "BillingCity",
+      "label": "Billing City",
+      "type": "string",
+      "aliases": ["city", "billing city", "location"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "BillingState",
+      "label": "Billing State",
+      "type": "string",
+      "aliases": ["state", "billing state", "province"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "BillingCountry",
+      "label": "Billing Country",
+      "type": "string",
+      "aliases": ["country", "billing country"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Industry",
+      "label": "Industry",
+      "type": "picklist",
+      "aliases": ["industry", "sector", "vertical"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "AnnualRevenue",
+      "label": "Annual Revenue",
+      "type": "currency",
+      "aliases": ["revenue", "annual revenue", "yearly revenue"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "NumberOfEmployees",
+      "label": "Number of Employees",
+      "type": "integer",
+      "aliases": ["employees", "headcount", "employee count", "staff"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Type",
+      "label": "Account Type",
+      "type": "picklist",
+      "aliases": ["account type", "type"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Website",
+      "label": "Website",
+      "type": "url",
+      "aliases": ["website", "url", "web"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "OwnerId",
+      "label": "Account Owner",
+      "type": "reference",
+      "aliases": ["owner", "account owner", "owner id"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "CreatedDate",
+      "label": "Created Date",
+      "type": "datetime",
+      "aliases": ["created", "created date", "created on"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "objectName": "Opportunity",
+  "label": "Opportunity",
+  "labelPlural": "Opportunities",
+  "aliases": ["opportunities", "opportunity", "deal", "deals", "opp", "opps", "pipeline"],
+  "fields": [
+    {
+      "fieldName": "Id",
+      "label": "Opportunity ID",
+      "type": "id",
+      "aliases": ["id", "opportunity id"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    },
+    {
+      "fieldName": "Name",
+      "label": "Opportunity Name",
+      "type": "string",
+      "aliases": ["name", "opportunity name", "deal name"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Amount",
+      "label": "Amount",
+      "type": "currency",
+      "aliases": ["amount", "value", "deal value", "deal size", "revenue", "price"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "StageName",
+      "label": "Stage",
+      "type": "picklist",
+      "aliases": ["stage", "status", "stage name", "sales stage"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "CloseDate",
+      "label": "Close Date",
+      "type": "date",
+      "aliases": ["close date", "closing date", "expected close", "close"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "AccountId",
+      "label": "Account Name",
+      "type": "reference",
+      "aliases": ["account", "company", "account id", "account name"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Probability",
+      "label": "Probability (%)",
+      "type": "percent",
+      "aliases": ["probability", "win probability", "chance", "likelihood"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "OwnerId",
+      "label": "Opportunity Owner",
+      "type": "reference",
+      "aliases": ["owner", "rep", "sales rep", "owner id"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "LeadSource",
+      "label": "Lead Source",
+      "type": "picklist",
+      "aliases": ["lead source", "source", "channel"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Type",
+      "label": "Opportunity Type",
+      "type": "picklist",
+      "aliases": ["type", "opportunity type", "deal type"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Description",
+      "label": "Description",
+      "type": "textarea",
+      "aliases": ["description", "notes", "details"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": false
+    },
+    {
+      "fieldName": "CreatedDate",
+      "label": "Created Date",
+      "type": "datetime",
+      "aliases": ["created", "created date"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    }
+  ]
+}

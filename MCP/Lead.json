@@ -1,0 +1,148 @@
+{
+  "objectName": "Lead",
+  "label": "Lead",
+  "labelPlural": "Leads",
+  "aliases": ["leads", "prospect", "prospects", "inquiry", "inquiries"],
+  "fields": [
+    {
+      "fieldName": "Id",
+      "label": "Lead ID",
+      "type": "id",
+      "aliases": ["id", "lead id"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    },
+    {
+      "fieldName": "FirstName",
+      "label": "First Name",
+      "type": "string",
+      "aliases": ["first name", "first"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "LastName",
+      "label": "Last Name",
+      "type": "string",
+      "aliases": ["last name", "last", "surname"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Email",
+      "label": "Email",
+      "type": "email",
+      "aliases": ["email", "email address"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Phone",
+      "label": "Phone",
+      "type": "phone",
+      "aliases": ["phone", "phone number", "telephone"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Company",
+      "label": "Company",
+      "type": "string",
+      "aliases": ["company", "company name", "employer", "organization"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Title",
+      "label": "Title",
+      "type": "string",
+      "aliases": ["title", "job title", "position"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Status",
+      "label": "Lead Status",
+      "type": "picklist",
+      "aliases": ["status", "lead status", "stage"],
+      "required": true,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "LeadSource",
+      "label": "Lead Source",
+      "type": "picklist",
+      "aliases": ["source", "lead source", "channel", "origin"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "Industry",
+      "label": "Industry",
+      "type": "picklist",
+      "aliases": ["industry", "sector", "vertical"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "State",
+      "label": "State/Province",
+      "type": "string",
+      "aliases": ["state", "province", "region"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "IsConverted",
+      "label": "Converted",
+      "type": "boolean",
+      "aliases": ["converted", "is converted"],
+      "required": false,
+      "updateable": false,
+      "createable": false,
+      "filterable": true
+    },
+    {
+      "fieldName": "Rating",
+      "label": "Rating",
+      "type": "picklist",
+      "aliases": ["rating", "lead rating", "score"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    },
+    {
+      "fieldName": "AnnualRevenue",
+      "label": "Annual Revenue",
+      "type": "currency",
+      "aliases": ["revenue", "annual revenue"],
+      "required": false,
+      "updateable": true,
+      "createable": true,
+      "filterable": true
+    }
+  ]
+}
