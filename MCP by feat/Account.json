@@ -1,0 +1,36 @@
+{
+  "name": "Account",
+  "label": "Account",
+  "labelPlural": "Accounts",
+  "keyPrefix": "001",
+  "fields": [
+    { "name": "Id", "label": "Account ID", "type": "id", "nillable": false, "updateable": false, "createable": false, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "Name", "label": "Account Name", "type": "string", "length": 255, "nillable": false, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "Phone", "label": "Phone", "type": "phone", "length": 40, "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "Website", "label": "Website", "type": "url", "length": 255, "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "BillingCity", "label": "Billing City", "type": "string", "length": 40, "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "BillingState", "label": "Billing State/Province", "type": "string", "length": 80, "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "BillingCountry", "label": "Billing Country", "type": "string", "length": 80, "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "Industry", "label": "Industry", "type": "picklist", "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [
+        { "value": "Technology", "label": "Technology", "active": true },
+        { "value": "Finance", "label": "Finance", "active": true },
+        { "value": "Healthcare", "label": "Healthcare", "active": true },
+        { "value": "Retail", "label": "Retail", "active": true },
+        { "value": "Manufacturing", "label": "Manufacturing", "active": true }
+    ]},
+    { "name": "Type", "label": "Account Type", "type": "picklist", "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [
+        { "value": "Prospect", "label": "Prospect", "active": true },
+        { "value": "Customer - Direct", "label": "Customer - Direct", "active": true },
+        { "value": "Customer - Channel", "label": "Customer - Channel", "active": true },
+        { "value": "Partner", "label": "Partner", "active": true }
+    ]},
+    { "name": "AnnualRevenue", "label": "Annual Revenue", "type": "currency", "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "NumberOfEmployees", "label": "Employees", "type": "int", "nillable": true, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "OwnerId", "label": "Owner ID", "type": "reference", "nillable": false, "updateable": true, "createable": true, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "CreatedDate", "label": "Created Date", "type": "datetime", "nillable": false, "updateable": false, "createable": false, "filterable": true, "sortable": true, "picklistValues": [] },
+    { "name": "LastModifiedDate", "label": "Last Modified Date", "type": "datetime", "nillable": false, "updateable": false, "createable": false, "filterable": true, "sortable": true, "picklistValues": [] }
+  ],
+  "relationships": [
+    { "name": "OwnerId", "referenceTo": ["User"], "relationshipName": "Owner" }
+  ]
+}
