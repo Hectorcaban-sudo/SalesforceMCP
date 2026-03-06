@@ -10,14 +10,17 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
 # -----------------------------
-# GLOBAL OBJECTS
+# GLOBAL STATE
 # -----------------------------
-history = ChatMessageHistory()
 tool_map = {}
 chain = None
 llm = None
+history = ChatMessageHistory()
 
 
+# -----------------------------
+# INITIALIZE AGENT
+# -----------------------------
 async def init_agent():
 
     global tool_map, chain, llm
@@ -28,7 +31,7 @@ async def init_agent():
                 "url": "https://api.salesforce.com/platform/mcp/v1-beta.2",
                 "transport": "streamable_http",
                 "headers": {
-                    "Authorization": "Bearer YOUR_TOKEN"
+                    "Authorization": "Bearer YOUR_ACCESS_TOKEN"
                 }
             }
         }
@@ -36,7 +39,7 @@ async def init_agent():
 
     tools = await mcp_client.get_tools()
 
-    tool_map = {t.name: t for t in tools}
+    tool_map = {tool.name: tool for tool in tools}
 
     llm = ChatOpenAI(
         model="gpt-4o-mini",
@@ -44,9 +47,11 @@ async def init_agent():
     ).bind_tools(tools)
 
     prompt = ChatPromptTemplate.from_messages([
-        ("system",
-         "You are a helpful assistant. "
-         "Use tools when necessary to retrieve Salesforce data."),
+        (
+            "system",
+            "You are a helpful assistant. "
+            "You can use tools to retrieve or update Salesforce data."
+        ),
         MessagesPlaceholder("history"),
         ("human", "{input}")
     ])
@@ -54,27 +59,28 @@ async def init_agent():
     chain = prompt | llm
 
 
+# -----------------------------
+# AGENT EXECUTION LOOP
+# -----------------------------
 async def agent_chat(user_message):
 
     history.add_message(HumanMessage(content=user_message))
 
     response = await chain.ainvoke({
         "input": user_message,
-        "history": history.messages
+        "history": history.messages[-20:]   # keep last 20 messages
     })
 
     history.add_message(response)
 
-    # -----------------------------
-    # TOOL LOOP
-    # -----------------------------
+    # Tool execution loop
     while response.tool_calls:
 
-        for call in response.tool_calls:
+        for tool_call in response.tool_calls:
 
-            tool_name = call["name"]
-            tool_args = call["args"]
-            tool_id = call["id"]
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+            tool_id = tool_call["id"]
 
             tool = tool_map[tool_name]
 
@@ -87,7 +93,7 @@ async def agent_chat(user_message):
                 )
             )
 
-        response = await llm.ainvoke(history.messages)
+        response = await llm.ainvoke(history.messages[-20:])
 
         history.add_message(response)
 
@@ -95,19 +101,27 @@ async def agent_chat(user_message):
 
 
 # -----------------------------
-# GRADIO WRAPPER
+# GRADIO HANDLER
 # -----------------------------
-def gradio_chat(message, chat_history):
+def gradio_chat(message, messages):
 
     response = asyncio.run(agent_chat(message))
 
-    chat_history.append((message, response))
+    messages.append({
+        "role": "user",
+        "content": message
+    })
 
-    return "", chat_history
+    messages.append({
+        "role": "assistant",
+        "content": response
+    })
+
+    return "", messages
 
 
 # -----------------------------
-# STARTUP
+# START AGENT
 # -----------------------------
 asyncio.run(init_agent())
 
@@ -117,9 +131,12 @@ asyncio.run(init_agent())
 # -----------------------------
 with gr.Blocks() as demo:
 
-    gr.Markdown("# MCP Salesforce Agent")
+    gr.Markdown("# Salesforce MCP Agent")
 
-    chatbot = gr.Chatbot(height=500)
+    chatbot = gr.Chatbot(
+        type="messages",
+        height=500
+    )
 
     msg = gr.Textbox(
         placeholder="Ask something about Salesforce..."
