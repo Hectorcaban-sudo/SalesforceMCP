@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Einstein AI Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Salesforce+Sans:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --sf-blue:        #0176d3;
+      --sf-blue-dark:   #014486;
+      --sf-blue-light:  #d8edff;
+      --sf-blue-hover:  #0156a8;
+      --sf-navy:        #032d60;
+      --sf-cloud:       #f3f3f3;
+      --sf-border:      #dddbda;
+      --sf-border-dark: #c9c7c5;
+      --sf-text:        #181818;
+      --sf-text-mid:    #3e3e3c;
+      --sf-text-light:  #706e6b;
+      --sf-white:       #ffffff;
+      --sf-success:     #2e844a;
+      --sf-warning:     #fe9339;
+      --sf-einstein:    #9c27b0;
+      --sf-einstein-bg: #f3e5f5;
+      --sf-shadow-sm:   0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+      --sf-shadow-md:   0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
+      --sf-shadow-lg:   0 8px 24px rgba(0,0,0,0.14), 0 4px 8px rgba(0,0,0,0.08);
+      --sf-radius:      0.25rem;
+      --sf-radius-lg:   0.5rem;
+      --sf-font:        'Salesforce Sans', 'Inter', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--sf-font);
+      background: var(--sf-cloud);
+      color: var(--sf-text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Global Nav Bar ─────────────────────────────────── */
+    .sf-nav {
+      background: var(--sf-navy);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      gap: 0.75rem;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .sf-nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .sf-nav-logo svg { width: 28px; height: 28px; }
+    .sf-nav-divider {
+      width: 1px;
+      height: 24px;
+      background: rgba(255,255,255,0.2);
+    }
+    .sf-nav-app {
+      color: rgba(255,255,255,0.85);
+      font-size: 0.875rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .sf-nav-spacer { flex: 1; }
+    .sf-nav-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0176d3, #032d60);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+
+    /* ── App Shell ──────────────────────────────────────── */
+    .sf-shell {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Main Content ───────────────────────────────────── */
+    .sf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--sf-cloud);
+    }
+
+    /* ── Page Header ────────────────────────────────────── */
+    .sf-page-header {
+      background: var(--sf-white);
+      border-bottom: 1px solid var(--sf-border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+    .sf-page-header-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--sf-radius);
+      background: linear-gradient(135deg, #9c27b0, #673ab7);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .sf-page-header-icon svg { width: 22px; height: 22px; color: #fff; }
+    .sf-page-header-info { flex: 1; }
+    .sf-page-header-eyebrow {
+      font-size: 0.6875rem;
+      color: var(--sf-text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+      margin-bottom: 0.1rem;
+    }
+    .sf-page-header-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--sf-text);
+      line-height: 1.2;
+    }
+    .sf-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: #e8f5e9;
+      color: var(--sf-success);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .sf-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--sf-success);
+    }
+
+    /* ── Chat Container ─────────────────────────────────── */
+    .sf-chat-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 1rem 1.5rem;
+      gap: 1rem;
+    }
+
+    /* ── Message List ───────────────────────────────────── */
+    .sf-messages {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 0.25rem 0;
+      scroll-behavior: smooth;
+    }
+    .sf-messages::-webkit-scrollbar { width: 6px; }
+    .sf-messages::-webkit-scrollbar-track { background: transparent; }
+    .sf-messages::-webkit-scrollbar-thumb {
+      background: var(--sf-border-dark);
+      border-radius: 3px;
+    }
+
+    /* ── Message Bubbles ────────────────────────────────── */
+    .sf-msg {
+      display: flex;
+      gap: 0.625rem;
+      animation: msgIn 0.2s ease-out both;
+    }
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .sf-msg.user { flex-direction: row-reverse; }
+
+    .sf-msg-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .sf-msg.user .sf-msg-avatar {
+      background: linear-gradient(135deg, #0176d3, #032d60);
+      color: #fff;
+    }
+    .sf-msg.assistant .sf-msg-avatar {
+      background: linear-gradient(135deg, #9c27b0, #673ab7);
+      color: #fff;
+    }
+
+    .sf-msg-body { max-width: 72%; display: flex; flex-direction: column; gap: 0.2rem; }
+    .sf-msg.user .sf-msg-body { align-items: flex-end; }
+
+    .sf-msg-name {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--sf-text-light);
+      letter-spacing: 0.02em;
+    }
+
+    .sf-msg-bubble {
+      padding: 0.625rem 0.875rem;
+      border-radius: var(--sf-radius-lg);
+      font-size: 0.8125rem;
+      line-height: 1.55;
+      word-break: break-word;
+      box-shadow: var(--sf-shadow-sm);
+    }
+    .sf-msg.user .sf-msg-bubble {
+      background: var(--sf-blue);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .sf-msg.assistant .sf-msg-bubble {
+      background: var(--sf-white);
+      color: var(--sf-text);
+      border: 1px solid var(--sf-border);
+      border-bottom-left-radius: 4px;
+    }
+    .sf-msg-time {
+      font-size: 0.625rem;
+      color: var(--sf-text-light);
+    }
+
+    /* ── Typing indicator ───────────────────────────────── */
+    .sf-typing .sf-msg-bubble {
+      padding: 0.75rem 1rem;
+    }
+    .sf-dots {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .sf-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--sf-text-light);
+      animation: dot-bounce 1.2s infinite ease-in-out;
+    }
+    .sf-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .sf-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-bounce {
+      0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+      40%            { transform: scale(1.0); opacity: 1; }
+    }
+
+    /* ── Suggestions ────────────────────────────────────── */
+    .sf-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.25rem 0;
+    }
+    .sf-suggestion-chip {
+      background: var(--sf-white);
+      border: 1px solid var(--sf-blue);
+      color: var(--sf-blue);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.3rem 0.75rem;
+      border-radius: 1rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      font-family: var(--sf-font);
+    }
+    .sf-suggestion-chip:hover {
+      background: var(--sf-blue-light);
+    }
+
+    /* ── Input Panel ────────────────────────────────────── */
+    .sf-input-panel {
+      background: var(--sf-white);
+      border: 1px solid var(--sf-border);
+      border-radius: var(--sf-radius-lg);
+      box-shadow: var(--sf-shadow-md);
+      overflow: hidden;
+    }
+    .sf-input-toolbar {
+      display: flex;
+      align-items: center;
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid var(--sf-border);
+      gap: 0.25rem;
+    }
+    .sf-tool-btn {
+      width: 28px; height: 28px;
+      border: none;
+      background: none;
+      border-radius: var(--sf-radius);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      color: var(--sf-text-light);
+      transition: background 0.1s, color 0.1s;
+    }
+    .sf-tool-btn:hover {
+      background: var(--sf-cloud);
+      color: var(--sf-text-mid);
+    }
+    .sf-tool-btn svg { width: 14px; height: 14px; }
+    .sf-tool-sep {
+      width: 1px; height: 16px;
+      background: var(--sf-border);
+      margin: 0 0.25rem;
+    }
+    .sf-input-row {
+      display: flex;
+      align-items: flex-end;
+      padding: 0.5rem 0.75rem;
+      gap: 0.5rem;
+    }
+    .sf-textarea {
+      flex: 1;
+      border: none;
+      outline: none;
+      resize: none;
+      font-family: var(--sf-font);
+      font-size: 0.8125rem;
+      color: var(--sf-text);
+      line-height: 1.5;
+      background: transparent;
+      min-height: 20px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .sf-textarea::placeholder { color: var(--sf-text-light); }
+
+    .sf-send-btn {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: var(--sf-blue);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: var(--sf-shadow-sm);
+    }
+    .sf-send-btn:hover { background: var(--sf-blue-hover); transform: scale(1.05); }
+    .sf-send-btn:disabled { background: var(--sf-border-dark); cursor: not-allowed; transform: none; }
+    .sf-send-btn svg { width: 15px; height: 15px; }
+
+    .sf-input-footer {
+      padding: 0.3rem 0.75rem;
+      font-size: 0.6rem;
+      color: var(--sf-text-light);
+      border-top: 1px solid var(--sf-border);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .sf-input-footer svg { width: 10px; height: 10px; color: var(--sf-einstein); }
+
+    /* ── Welcome State ──────────────────────────────────── */
+    .sf-welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 1rem;
+      text-align: center;
+      padding: 2rem;
+      animation: fadeIn 0.4s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .sf-welcome-icon {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #9c27b0, #673ab7);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 20px rgba(156, 39, 176, 0.35);
+    }
+    .sf-welcome-icon svg { width: 36px; height: 36px; color: #fff; }
+    .sf-welcome h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--sf-text);
+    }
+    .sf-welcome p {
+      font-size: 0.8125rem;
+      color: var(--sf-text-light);
+      max-width: 320px;
+      line-height: 1.6;
+    }
+
+    /* ── Error toast ────────────────────────────────────── */
+    .sf-error-toast {
+      background: #fef0f0;
+      border: 1px solid #fcc;
+      color: #c23934;
+      font-size: 0.75rem;
+      padding: 0.5rem 0.875rem;
+      border-radius: var(--sf-radius);
+      display: none;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .sf-error-toast.visible { display: flex; }
+    .sf-error-toast svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* scrollbar thin on textarea */
+    .sf-textarea::-webkit-scrollbar { width: 4px; }
+    .sf-textarea::-webkit-scrollbar-thumb { background: var(--sf-border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Global Nav ─────────────────────────────────────────────── -->
+<nav class="sf-nav">
+  <div class="sf-nav-logo">
+    <!-- Salesforce cloud logo SVG -->
+    <svg viewBox="0 0 52 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M21.5 6.5C23.7 3.9 27 2.3 30.7 2.3c5.3 0 9.9 3.2 12 7.8 2.1-.9 4.4-1.4 6.8-1.4 9.1 0 16.5 7.3 16.5 16.2S58.6 41 49.5 41H13C5.8 41 0 35.3 0 28.2c0-6.2 4.3-11.4 10.1-12.8-.6-1.4-.9-2.9-.9-4.5 0-6.3 5.1-11.4 11.5-11.4 1 0 1.9.1 2.8.4z" fill="white" transform="scale(0.54) translate(0,0)"/>
+    </svg>
+    Salesforce
+  </div>
+  <div class="sf-nav-divider"></div>
+  <span class="sf-nav-app">Einstein AI</span>
+  <div class="sf-nav-spacer"></div>
+  <div class="sf-nav-avatar">JD</div>
+</nav>
+
+<!-- ── Shell ─────────────────────────────────────────────────────── -->
+<div class="sf-shell">
+  <!-- Main -->
+  <main class="sf-main">
+
+    <!-- Page Header -->
+    <div class="sf-page-header">
+      <div class="sf-page-header-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+        </svg>
+      </div>
+      <div class="sf-page-header-info">
+        <div class="sf-page-header-eyebrow">Agentforce</div>
+        <div class="sf-page-header-title">Einstein AI Assistant</div>
+      </div>
+      <span class="sf-badge">Online</span>
+    </div>
+
+    <!-- Chat -->
+    <div class="sf-chat-wrap">
+
+      <!-- Messages -->
+      <div class="sf-messages" id="messages">
+        <div class="sf-welcome" id="welcome">
+          <div class="sf-welcome-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+            </svg>
+          </div>
+          <h2>Hi, I'm Einstein</h2>
+          <p>Your AI-powered assistant. Ask me anything about your Salesforce data, get help with tasks, or just have a conversation.</p>
+          <div class="sf-suggestions" id="welcomeSuggestions">
+            <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">Summarize my open cases</button>
+            <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">What's in my pipeline?</button>
+            <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">Draft a follow-up email</button>
+            <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">Show top opportunities</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="sf-error-toast" id="errorToast">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="errorMsg">Something went wrong. Please try again.</span>
+      </div>
+
+      <!-- Input Panel -->
+      <div class="sf-input-panel">
+        <div class="sf-input-toolbar">
+          <button class="sf-tool-btn" title="Attach file">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <button class="sf-tool-btn" title="Insert knowledge">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <div class="sf-tool-sep"></div>
+          <button class="sf-tool-btn" title="Clear conversation" onclick="clearChat()">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+        <div class="sf-input-row">
+          <textarea
+            class="sf-textarea"
+            id="chatInput"
+            placeholder="Ask Einstein anything…"
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <button class="sf-send-btn" id="sendBtn" onclick="sendMessage()" title="Send">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div class="sf-input-footer">
+          <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+          Powered by Einstein AI · Responses may not always be accurate
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────
+  let history = [];   // List<ChatMessage> maintained client-side
+  let isLoading = false;
+
+  // ── Helpers ────────────────────────────────────────────────────
+  function now() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function showError(msg) {
+    const t = document.getElementById('errorToast');
+    document.getElementById('errorMsg').textContent = msg;
+    t.classList.add('visible');
+    setTimeout(() => t.classList.remove('visible'), 5000);
+  }
+
+  function hideWelcome() {
+    const w = document.getElementById('welcome');
+    if (w) w.remove();
+  }
+
+  function scrollBottom() {
+    const el = document.getElementById('messages');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // ── Render a message bubble ────────────────────────────────────
+  function appendMessage(role, text, typing = false) {
+    hideWelcome();
+    const container = document.getElementById('messages');
+
+    const wrap = document.createElement('div');
+    wrap.className = `sf-msg ${role}`;
+    if (typing) wrap.id = 'typingIndicator';
+
+    const isUser = role === 'user';
+    const initials = isUser ? 'JD' : 'AI';
+    const name     = isUser ? 'John Doe' : 'Einstein';
+
+    wrap.innerHTML = `
+      <div class="sf-msg-avatar">${initials}</div>
+      <div class="sf-msg-body">
+        <span class="sf-msg-name">${name}</span>
+        <div class="sf-msg-bubble ${typing ? '' : ''}">
+          ${typing
+            ? `<div class="sf-dots"><span></span><span></span><span></span></div>`
+            : escapeHtml(text).replace(/\n/g, '<br>')}
+        </div>
+        ${!typing ? `<span class="sf-msg-time">${now()}</span>` : ''}
+      </div>`;
+
+    container.appendChild(wrap);
+    scrollBottom();
+    return wrap;
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Send ───────────────────────────────────────────────────────
+  async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const text  = input.value.trim();
+    if (!text || isLoading) return;
+
+    // Add to UI + history
+    appendMessage('user', text);
+    history.push({ role: 'user', contents: [{ $type: 'TextContent', text }] });
+
+    input.value = '';
+    input.style.height = 'auto';
+    setLoading(true);
+
+    // Show typing indicator
+    appendMessage('assistant', '', true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(history)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      // Server returns updated List<ChatMessage> with assistant reply appended
+      history = await res.json();
+
+      // Get assistant reply text from last message's contents
+      const lastMsg    = history[history.length - 1];
+      const replyText  = (lastMsg.contents || [])
+        .filter(c => c.$type === 'TextContent' || c.text)
+        .map(c => c.text || '')
+        .join('');
+
+      // Replace typing indicator with real reply
+      removeTyping();
+      appendMessage('assistant', replyText);
+
+    } catch (err) {
+      removeTyping();
+      showError(err.message || 'Could not reach Einstein. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function removeTyping() {
+    const t = document.getElementById('typingIndicator');
+    if (t) t.remove();
+  }
+
+  function setLoading(val) {
+    isLoading = val;
+    document.getElementById('sendBtn').disabled = val;
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function sendSuggestion(btn) {
+    document.getElementById('chatInput').value = btn.textContent;
+    sendMessage();
+  }
+
+  function clearChat() {
+    history = [];
+    const msgs = document.getElementById('messages');
+    msgs.innerHTML = `
+      <div class="sf-welcome" id="welcome">
+        <div class="sf-welcome-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+          </svg>
+        </div>
+        <h2>Hi, I'm Einstein</h2>
+        <p>Your AI-powered assistant. Ask me anything about your Salesforce data, get help with tasks, or just have a conversation.</p>
+        <div class="sf-suggestions" id="welcomeSuggestions">
+          <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">Summarize my open cases</button>
+          <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">What's in my pipeline?</button>
+          <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">Draft a follow-up email</button>
+          <button class="sf-suggestion-chip" onclick="sendSuggestion(this)">Show top opportunities</button>
+        </div>
+      </div>`;
+  }
+</script>
+</body>
+</html>
