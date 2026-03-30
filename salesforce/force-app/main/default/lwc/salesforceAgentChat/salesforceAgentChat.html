@@ -1,0 +1,43 @@
+<template>
+    <section class="chat-shell slds-card">
+        <div class="slds-card__header slds-grid chat-header">
+            <header class="slds-media slds-media_center slds-has-flexi-truncate">
+                <div class="slds-media__body">
+                    <h2 class="slds-card__header-title">Salesforce SOQL Multi-Agent Chat</h2>
+                    <p class="subtitle">Accounts · Opportunities · Contracts</p>
+                </div>
+            </header>
+        </div>
+
+        <div class="chat-body">
+            <template for:each={uiMessages} for:item="msg">
+                <article key={msg.id} class={msg.cssClass}>
+                    <p>{msg.text}</p>
+                </article>
+            </template>
+        </div>
+
+        <template lwc:if={errorMessage}>
+            <div class="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error" role="alert">
+                <span class="slds-assistive-text">Error</span>
+                <h2>{errorMessage}</h2>
+            </div>
+        </template>
+
+        <div class="chat-input">
+            <lightning-textarea
+                label="Ask in natural language"
+                value={inputValue}
+                onchange={handleInput}
+                onkeydown={handleKeyDown}
+                placeholder="Example: show top 5 opportunities closing this month">
+            </lightning-textarea>
+            <lightning-button
+                variant="brand"
+                label="Send"
+                onclick={sendMessage}
+                disabled={sendDisabled}>
+            </lightning-button>
+        </div>
+    </section>
+</template>
