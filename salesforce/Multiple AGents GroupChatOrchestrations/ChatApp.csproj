@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Suppress experimental agent API warnings -->
+    <NoWarn>$(NoWarn);CA2007;IDE1006;SKEXP0001;SKEXP0110;SKEXP0130;SKEXP0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SemanticKernel"                              Version="1.30.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Agents.Core"                 Version="1.30.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Agents.Orchestration"        Version="1.30.0-preview" />
+    <PackageReference Include="Microsoft.SemanticKernel.Agents.Runtime.InProcess"    Version="1.30.0-preview" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Anthropic"        Version="1.30.0-alpha" />
+
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi"  Version="8.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore"        Version="6.5.0" />
+  </ItemGroup>
+
+</Project>
