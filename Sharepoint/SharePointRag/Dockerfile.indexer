@@ -1,0 +1,30 @@
+# ── Build stage ────────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+COPY SharePointRag.sln .
+COPY src/SharePointRag.Core/SharePointRag.Core.csproj           src/SharePointRag.Core/
+COPY src/SharePointRag.Agent/SharePointRag.Agent.csproj         src/SharePointRag.Agent/
+COPY src/SharePointRag.Api/SharePointRag.Api.csproj             src/SharePointRag.Api/
+COPY src/SharePointRag.Indexer/SharePointRag.Indexer.csproj     src/SharePointRag.Indexer/
+
+RUN dotnet restore
+
+COPY . .
+RUN dotnet publish src/SharePointRag.Indexer/SharePointRag.Indexer.csproj \
+    -c Release -o /app/indexer --no-restore
+
+# ── Runtime stage ──────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+WORKDIR /app
+
+RUN adduser --disabled-password --gecos "" appuser
+RUN mkdir -p /app/data && chown -R appuser /app
+USER appuser
+
+COPY --from=build /app/indexer .
+
+# Persist index state across container restarts
+VOLUME ["/app/data"]
+
+ENTRYPOINT ["dotnet", "SharePointRag.Indexer.dll"]

@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  # ── SharePoint RAG API + Agent endpoint ──────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # Override appsettings via environment variables (double-underscore = nesting)
+      SharePoint__SiteUrl: "${SP_SITE_URL}"
+      SharePoint__TenantId: "${TENANT_ID}"
+      SharePoint__ClientId: "${SP_CLIENT_ID}"
+      SharePoint__ClientSecret: "${SP_CLIENT_SECRET}"
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey: "${AOAI_KEY}"
+      AzureSearch__Endpoint: "${SEARCH_ENDPOINT}"
+      AzureSearch__ApiKey: "${SEARCH_KEY}"
+      AgentAuthentication__ClientId: "${BOT_CLIENT_ID}"
+      AgentAuthentication__ClientSecret: "${BOT_CLIENT_SECRET}"
+      AgentAuthentication__TenantId: "${TENANT_ID}"
+    volumes:
+      - rag_state:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Background indexer ────────────────────────────────────────────────────────
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile.indexer
+    environment:
+      SharePoint__SiteUrl: "${SP_SITE_URL}"
+      SharePoint__TenantId: "${TENANT_ID}"
+      SharePoint__ClientId: "${SP_CLIENT_ID}"
+      SharePoint__ClientSecret: "${SP_CLIENT_SECRET}"
+      SharePoint__CrawlParallelism: "8"
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey: "${AOAI_KEY}"
+      AzureSearch__Endpoint: "${SEARCH_ENDPOINT}"
+      AzureSearch__ApiKey: "${SEARCH_KEY}"
+      Indexer__DeltaIntervalMinutes: "30"
+      Indexer__FullIndexIntervalHours: "24"
+    volumes:
+      - rag_state:/app/data
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  rag_state:

@@ -1,0 +1,102 @@
+using Azure.AI.OpenAI;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OpenAI.Chat;
+using SharePointRag.Core.Configuration;
+using SharePointRag.Core.Interfaces;
+using SharePointRag.Core.Models;
+using System.Text;
+
+namespace SharePointRag.Core.Services;
+
+/// <summary>
+/// Implements Retrieval-Augmented Generation:
+///   1. Embed the question
+///   2. Retrieve top-K chunks from vector store
+///   3. Build a context-grounded prompt
+///   4. Stream a chat completion via Azure OpenAI
+/// </summary>
+public sealed class RagOrchestrator(
+    IEmbeddingService embedder,
+    IVectorStore vectorStore,
+    AzureOpenAIClient openAi,
+    IOptions<AzureOpenAIOptions> aoaiOpts,
+    IOptions<AzureSearchOptions> searchOpts,
+    IOptions<AgentOptions> agentOpts,
+    ILogger<RagOrchestrator> logger) : IRagOrchestrator
+{
+    private readonly AzureOpenAIOptions _aoai    = aoaiOpts.Value;
+    private readonly AzureSearchOptions _search  = searchOpts.Value;
+    private readonly AgentOptions       _agent   = agentOpts.Value;
+
+    public async Task<RagResponse> AskAsync(string question, CancellationToken ct = default)
+    {
+        logger.LogInformation("RAG question: {Q}", question);
+
+        // 1. Embed the question
+        var queryVector = await embedder.EmbedAsync(question, ct);
+
+        // 2. Retrieve relevant chunks
+        var sources = await vectorStore.SearchAsync(queryVector, _search.TopK, ct);
+        logger.LogInformation("Retrieved {N} chunks", sources.Count);
+
+        if (sources.Count == 0)
+        {
+            return new RagResponse(
+                question,
+                "I could not find any relevant information in the document library for your question.",
+                sources);
+        }
+
+        // 3. Build context string
+        var context = BuildContext(sources);
+
+        // 4. Call chat completion
+        var answer = await GenerateAnswerAsync(question, context, ct);
+
+        return new RagResponse(question, answer, sources);
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private static string BuildContext(IReadOnlyList<RetrievedChunk> chunks)
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            var c = chunks[i].Chunk;
+            sb.AppendLine($"[{i + 1}] Source: {c.FileName}  URL: {c.WebUrl}");
+            sb.AppendLine(c.Content);
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    private async Task<string> GenerateAnswerAsync(
+        string question, string context, CancellationToken ct)
+    {
+        var client = openAi.GetChatClient(_aoai.ChatDeployment);
+
+        var messages = new List<ChatMessage>
+        {
+            new SystemChatMessage(_agent.SystemPrompt),
+            new UserChatMessage(
+                $"""
+                ### Retrieved context
+                {context}
+
+                ### User question
+                {question}
+                """)
+        };
+
+        var options = new ChatCompletionOptions
+        {
+            MaxOutputTokenCount = _agent.MaxTokens,
+            Temperature = (float)_agent.Temperature
+        };
+
+        var response = await client.CompleteChatAsync(messages, options, ct);
+        return response.Value.Content[0].Text;
+    }
+}
