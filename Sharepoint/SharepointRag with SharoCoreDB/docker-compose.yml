@@ -1,0 +1,72 @@
+version: "3.9"
+
+# SharpCoreDB is an embedded, file-based database — no separate DB container needed.
+# The encrypted .scdb files live in the named volume 'rag_data' shared between
+# the API and the Indexer so both processes see the same HNSW index.
+
+services:
+
+  # ── SharePoint RAG API + Microsoft.Agents bot endpoint ───────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: sharepoint-rag-api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # SharePoint / Graph
+      SharePoint__SiteUrl: "${SP_SITE_URL}"
+      SharePoint__TenantId: "${TENANT_ID}"
+      SharePoint__ClientId: "${SP_CLIENT_ID}"
+      SharePoint__ClientSecret: "${SP_CLIENT_SECRET}"
+      # Azure OpenAI
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey: "${AOAI_KEY}"
+      # SharpCoreDB – shared volume path + encryption password
+      SharpCoreDB__DataDirectory: "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      # Bot Framework
+      AgentAuthentication__ClientId: "${BOT_CLIENT_ID}"
+      AgentAuthentication__ClientSecret: "${BOT_CLIENT_SECRET}"
+      AgentAuthentication__TenantId: "${TENANT_ID}"
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Background indexer (full + delta, scheduled) ──────────────────────────────
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile.indexer
+    container_name: sharepoint-rag-indexer
+    environment:
+      # SharePoint / Graph
+      SharePoint__SiteUrl: "${SP_SITE_URL}"
+      SharePoint__TenantId: "${TENANT_ID}"
+      SharePoint__ClientId: "${SP_CLIENT_ID}"
+      SharePoint__ClientSecret: "${SP_CLIENT_SECRET}"
+      SharePoint__CrawlParallelism: "8"
+      # Azure OpenAI
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey: "${AOAI_KEY}"
+      # SharpCoreDB – same shared volume
+      SharpCoreDB__DataDirectory: "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      # Schedule
+      Indexer__DeltaIntervalMinutes: "30"
+      Indexer__FullIndexIntervalHours: "24"
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  rag_data:   # single encrypted SharpCoreDB data directory shared by API + Indexer
