@@ -1,0 +1,38 @@
+# Define the network share path
+$networkPath = "\\server\share"
+$solutionDir = Get-Location
+
+# Find all .csproj files (excluding common non-web/test folders)
+$projects = Get-ChildItem -Path $solutionDir -Filter *.csproj -Recurse | Where-Object { 
+    $_.FullName -notmatch "Test" -and $_.FullName -notmatch "obj" -and $_.FullName -notmatch "bin" 
+}
+
+Write-Host "Starting publish to $networkPath..." -ForegroundColor Cyan
+
+foreach ($project in $projects) {
+    $projectName = [System.IO.Path]::GetFileNameWithoutExtension($project.Name)
+    
+    # Combine the share path with the project name
+    $projectOutputPath = Join-Path $networkPath $projectName
+    
+    Write-Host "Publishing $projectName to network..." -ForegroundColor Yellow
+    
+    # Execute the dotnet publish command
+    # Note: We use -Force on directory creation if the share is sensitive to IO calls
+    if (!(Test-Path $projectOutputPath)) {
+        New-Item -ItemType Directory -Path $projectOutputPath -Force | Out-Null
+    }
+
+    dotnet publish $project.FullName `
+        --configuration Release `
+        --output $projectOutputPath `
+        --runtime win-x64 `
+        --self-contained false `
+        /p:PublishReadyToRun=true
+        
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Successfully published $projectName" -ForegroundColor Green
+    } else {
+        Write-Error "Failed to publish $projectName. Check network permissions."
+    }
+}
