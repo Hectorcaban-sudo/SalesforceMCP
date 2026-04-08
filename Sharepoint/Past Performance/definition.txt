@@ -1,0 +1,33 @@
+A **Past Performance Agent** is a specialized AI entity designed to manage and leverage a company’s history of completed projects—specifically in the context of government contracting (GovCon) or large-scale B2B industries. Its primary goal is to prove to potential clients that "we’ve done this before, and we did it well."
+
+In industries like defense or federal contracting, "Past Performance" is a formal metric used by evaluators to determine risk. Here is what an agent dedicated to this domain would typically do:
+
+### 1. Data Aggregation and Normalization
+The agent acts as a central brain for disparate data sources. It scrapes internal systems (like Salesforce, Deltek, or SharePoint) to find:
+* **Contract Details:** Award amounts, dates, and NAICS codes.
+* **Performance Metrics:** Whether the project was on time and within budget.
+* **CPARS Integration:** Automatically pulling and indexing *Contractor Performance Assessment Reporting System* (CPARS) ratings to identify high-scoring projects.
+
+### 2. Intelligent Search and Retrieval (RAG)
+When a new Request for Proposal (RFP) is released, the agent performs a semantic search to find the most relevant historical matches. Instead of just searching for "software," it can distinguish between "cloud migration for a legacy mainframe" and "front-end web development," ensuring the best technical fit is surfaced.
+
+### 3. Automated Drafting of Narratives
+One of the most time-consuming tasks in proposal writing is tailoring past performance stories to fit specific RFP requirements. The agent can:
+* Synthesize technical data into a cohesive **"Success Story."**
+* Rewrite existing project descriptions to emphasize specific keywords found in a new solicitation.
+* Ensure that the "Value Added" section of a past performance sheet aligns with the current client’s pain points.
+
+### 4. Gap Analysis and Risk Mitigation
+The agent evaluates the company’s portfolio against a target contract to identify weaknesses:
+* **The "Gap" Check:** "We are bidding on a \$50M project, but our largest past performance is only \$10M."
+* **The "Risk" Alert:** Identifying if a project had a "Marginal" rating in a specific area (like Quality or Schedule) so the capture team can address it proactively in the proposal.
+
+### 5. Compliance and Cross-Referencing
+The agent ensures that the "Past Performance" volume of a bid meets strict government formatting rules, such as:
+* Verifying that points of contact (POCs) for past clients are still active and accurate.
+* Checking that the project dates fall within the "Recency" window (typically the last 3–5 years).
+
+---
+
+### Why it Matters
+For a government contractor, a Past Performance Agent transforms static archives into a **predictive asset**. It moves the company away from "What projects do we have?" to "Which of our past successes guarantees we win this specific bid?"
