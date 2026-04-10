@@ -1,0 +1,78 @@
+version: "3.9"
+
+# SharpCoreDB is embedded — no external DB container needed.
+# All encrypted vector + metadata files live in the 'rag_data' named volume,
+# shared by the API (reads) and the Indexer (writes).
+
+services:
+
+  # ── SharePoint RAG API ────────────────────────────────────────────────────────
+  # Hosts two Microsoft.Agents bots on separate routes:
+  #   /api/messages                   → general SharePoint RAG bot
+  #   /api/pastperformance/messages   → GovCon Past Performance specialist bot
+  # Plus REST endpoints:
+  #   /api/rag/ask
+  #   /api/pastperformance/ask|volume|contracts/search|cpars|gaps
+  #   /api/index/provision|full|delta|status
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: sharepoint-rag-api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # SharePoint / Graph
+      SharePoint__SiteUrl:      "${SP_SITE_URL}"
+      SharePoint__TenantId:     "${TENANT_ID}"
+      SharePoint__ClientId:     "${SP_CLIENT_ID}"
+      SharePoint__ClientSecret: "${SP_CLIENT_SECRET}"
+      # Azure OpenAI
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:   "${AOAI_KEY}"
+      # SharpCoreDB
+      SharpCoreDB__DataDirectory:      "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      SharpCoreDB__TopK:               "8"
+      SharpCoreDB__MinScore:           "0.45"
+      # Bot Framework (both agents share one app registration)
+      AgentAuthentication__ClientId:     "${BOT_CLIENT_ID}"
+      AgentAuthentication__ClientSecret: "${BOT_CLIENT_SECRET}"
+      AgentAuthentication__TenantId:     "${TENANT_ID}"
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Background indexer ────────────────────────────────────────────────────────
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile.indexer
+    container_name: sharepoint-rag-indexer
+    environment:
+      SharePoint__SiteUrl:        "${SP_SITE_URL}"
+      SharePoint__TenantId:       "${TENANT_ID}"
+      SharePoint__ClientId:       "${SP_CLIENT_ID}"
+      SharePoint__ClientSecret:   "${SP_CLIENT_SECRET}"
+      SharePoint__CrawlParallelism: "8"
+      AzureOpenAI__Endpoint:      "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:        "${AOAI_KEY}"
+      SharpCoreDB__DataDirectory: "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      Indexer__DeltaIntervalMinutes:   "30"
+      Indexer__FullIndexIntervalHours: "24"
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  rag_data:
