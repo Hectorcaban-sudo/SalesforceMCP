@@ -1,0 +1,89 @@
+version: "3.9"
+
+# Multi-library RAG system.
+# SharpCoreDB is embedded — no external DB needed.
+# Each RAG system gets its own sub-directory under /app/data/scdb/:
+#   /app/data/scdb/General/
+#   /app/data/scdb/PastPerformance/
+#   /app/data/scdb/ProposalArchive/
+#   /app/data/scdb/HR/
+#   /app/data/scdb/AllContent/     (federated across all libraries)
+
+services:
+
+  # ── API: both bots + all REST endpoints ──────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: sharepoint-rag-api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Global Graph fallback credentials
+      GlobalGraph__TenantId:     "${TENANT_ID}"
+      GlobalGraph__ClientId:     "${SP_CLIENT_ID}"
+      GlobalGraph__ClientSecret: "${SP_CLIENT_SECRET}"
+      # Azure OpenAI
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:   "${AOAI_KEY}"
+      # SharpCoreDB
+      SharpCoreDB__DataDirectory:      "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      # Bot Framework
+      AgentAuthentication__ClientId:     "${BOT_CLIENT_ID}"
+      AgentAuthentication__ClientSecret: "${BOT_CLIENT_SECRET}"
+      AgentAuthentication__TenantId:     "${TENANT_ID}"
+      # Per-library app registrations (if using dedicated creds per library)
+      # These override GlobalGraph for the specific library:
+      # RagRegistry__Libraries__1__ClientId:     "${PP_CLIENT_ID}"
+      # RagRegistry__Libraries__1__ClientSecret: "${PP_CLIENT_SECRET}"
+      # RagRegistry__Libraries__2__ClientId:     "${PROPOSALS_CLIENT_ID}"
+      # RagRegistry__Libraries__2__ClientSecret: "${PROPOSALS_CLIENT_SECRET}"
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Indexer: full + delta indexing on schedule ────────────────────────────────
+  # By default indexes ALL systems. Scale horizontally by running multiple
+  # indexer containers with different INDEXER__SYSTEMFILTER values:
+  #
+  #   indexer-pp:
+  #     environment:
+  #       Indexer__SystemFilter__0: "PastPerformance"
+  #       Indexer__SystemFilter__1: "ProposalArchive"
+  #   indexer-general:
+  #     environment:
+  #       Indexer__SystemFilter__0: "General"
+  #       Indexer__SystemFilter__1: "HR"
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile.indexer
+    container_name: sharepoint-rag-indexer
+    environment:
+      GlobalGraph__TenantId:     "${TENANT_ID}"
+      GlobalGraph__ClientId:     "${SP_CLIENT_ID}"
+      GlobalGraph__ClientSecret: "${SP_CLIENT_SECRET}"
+      AzureOpenAI__Endpoint:     "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:       "${AOAI_KEY}"
+      SharpCoreDB__DataDirectory:      "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      Indexer__DeltaIntervalMinutes:   "30"
+      Indexer__FullIndexIntervalHours: "24"
+      # Indexer__SystemFilter__0: "PastPerformance"   # uncomment to restrict
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  rag_data:

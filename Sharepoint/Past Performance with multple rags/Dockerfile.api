@@ -1,0 +1,33 @@
+# ── Build stage ────────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy solution and project files first (layer cache friendly)
+COPY SharePointRag.sln .
+COPY src/SharePointRag.Core/SharePointRag.Core.csproj           src/SharePointRag.Core/
+COPY src/SharePointRag.Agent/SharePointRag.Agent.csproj         src/SharePointRag.Agent/
+COPY src/SharePointRag.Api/SharePointRag.Api.csproj             src/SharePointRag.Api/
+COPY src/SharePointRag.Indexer/SharePointRag.Indexer.csproj     src/SharePointRag.Indexer/
+
+RUN dotnet restore
+
+# Copy remaining sources and publish
+COPY . .
+RUN dotnet publish src/SharePointRag.Api/SharePointRag.Api.csproj \
+    -c Release -o /app/api --no-restore
+
+# ── Runtime stage ──────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+
+# Non-root user for security
+RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
+USER appuser
+
+COPY --from=build /app/api .
+
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+ENTRYPOINT ["dotnet", "SharePointRag.Api.dll"]

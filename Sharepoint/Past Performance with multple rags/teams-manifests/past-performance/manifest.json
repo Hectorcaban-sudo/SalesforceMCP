@@ -1,0 +1,63 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "<YOUR-PP-TEAMS-APP-ID>",
+  "packageName": "com.yourcompany.pastperformanceagent",
+
+  "developer": {
+    "name": "Your Company",
+    "websiteUrl": "https://yourcompany.com",
+    "privacyUrl": "https://yourcompany.com/privacy",
+    "termsOfUseUrl": "https://yourcompany.com/terms"
+  },
+
+  "name": {
+    "short": "Past Performance Agent",
+    "full": "GovCon Past Performance Agent"
+  },
+
+  "description": {
+    "short": "Find, analyse and draft past performance content for proposals.",
+    "full": "The Past Performance Agent searches your SharePoint library of past performance documents, extracts structured contract records, scores them against RFP requirements, and drafts FAR 15.305-compliant proposal narratives — all from a Teams chat."
+  },
+
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+
+  "accentColor": "#1F3864",
+
+  "bots": [
+    {
+      "botId": "<YOUR-BOT-APP-CLIENT-ID>",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            {
+              "title": "help",
+              "description": "Show usage guidance and supported query types"
+            },
+            {
+              "title": "intents",
+              "description": "List all supported query intents with examples"
+            },
+            {
+              "title": "status",
+              "description": "Show index and service status"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "permissions": ["identity", "messageTeamMembers"],
+
+  "validDomains": ["*.botframework.com", "yourdomain.com"]
+}
