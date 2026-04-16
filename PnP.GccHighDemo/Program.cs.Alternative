@@ -1,0 +1,98 @@
+// ============================================================================
+// Alternative Program.cs showing different configuration approaches
+// ============================================================================
+
+using PnP.Core.Services;
+using PnP.GccHighDemo.Services;
+using PnP.GccHighDemo;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// ==========================================================================
+// OPTION 1: Certificate-Based Authentication (RECOMMENDED for SharePoint)
+// ==========================================================================
+// This is the recommended approach for full SharePoint + Graph API access.
+// The IPnPContextFactory is registered as singleton by PnP.Core.
+
+builder.Services.AddPnPCoreWithCertificate(builder.Configuration);
+
+// Register SharePoint service as singleton
+builder.Services.AddSingleton<ISharePointService, SharePointService>();
+
+// ==========================================================================
+// OPTION 2: ClientSecret Authentication (Graph-only, limited functionality)
+// ==========================================================================
+// Uncomment below and comment out OPTION 1 if you must use ClientSecret.
+// WARNING: This only works for Microsoft Graph API calls.
+// SharePoint REST APIs will fail with authentication errors.
+
+// builder.Services.AddPnPCoreWithClientSecret(builder.Configuration);
+// builder.Services.AddSingleton<ISharePointService, SharePointService>();
+
+// ==========================================================================
+// OPTION 3: Manual configuration (for advanced scenarios)
+// ==========================================================================
+/*
+builder.Services.AddPnPCore(options =>
+{
+    // Environment is critical for GCC High
+    options.Environment = Microsoft365Environment.USGovernmentHigh;
+    
+    options.PnPContext.GraphFirst = true;
+    options.PnPContext.GraphCanUseBeta = true;
+    
+    options.Sites.Add("TargetSite", new PnPCoreSiteOptions
+    {
+        SiteUrl = builder.Configuration["PnPCore:Sites:TargetSite:SiteUrl"]!
+    });
+});
+
+builder.Services.AddPnPCoreAuthentication(options =>
+{
+    options.Credentials.Configurations.Add("CertificateAuth",
+        new PnPCoreAuthenticationCredentialConfigurationOptions
+        {
+            ClientId = builder.Configuration["PnPCore:Credentials:Configurations:CertificateAuth:ClientId"]!,
+            TenantId = builder.Configuration["PnPCore:Credentials:Configurations:CertificateAuth:TenantId"]!,
+            X509Certificate = new PnPCoreAuthenticationX509CertificateOptions
+            {
+                StoreName = StoreName.My,
+                StoreLocation = StoreLocation.CurrentUser,
+                Thumbprint = builder.Configuration["PnPCore:Credentials:Configurations:CertificateAuth:X509Certificate:Thumbprint"]!
+            }
+        });
+    
+    options.Credentials.DefaultConfiguration = "CertificateAuth";
+    
+    options.Sites.Add("TargetSite",
+        new PnPCoreAuthenticationSiteOptions
+        {
+            AuthenticationProviderName = "CertificateAuth"
+        });
+});
+
+builder.Services.AddSingleton<ISharePointService, SharePointService>();
+*/
+
+// ==========================================================================
+// Build and run the application
+// ==========================================================================
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
