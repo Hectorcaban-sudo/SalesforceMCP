@@ -1,0 +1,69 @@
+version: "3.9"
+
+# Multi-source RAG system.
+# SharpCoreDB is embedded — no external DB needed.
+# Each system gets an isolated sub-directory under /app/data/scdb/
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: sharepoint-rag-api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      GlobalGraph__TenantId:     "${TENANT_ID}"
+      GlobalGraph__ClientId:     "${SP_CLIENT_ID}"
+      GlobalGraph__ClientSecret: "${SP_CLIENT_SECRET}"
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:   "${AOAI_KEY}"
+      SharpCoreDB__DataDirectory:      "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      AgentAuthentication__ClientId:     "${BOT_CLIENT_ID}"
+      AgentAuthentication__ClientSecret: "${BOT_CLIENT_SECRET}"
+      AgentAuthentication__TenantId:     "${TENANT_ID}"
+      # SQL connector credentials (example — set per-datasource)
+      # Injected inline into the connection string or override the whole section:
+      # RagRegistry__DataSources__2__Properties__ConnectionString: "${COSTPOINT_CONN_STR}"
+      # Deltek credentials
+      # RagRegistry__DataSources__6__Properties__ApiKey: "${DELTEK_TOKEN}"
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Indexer: indexes all systems by default.
+  # Use Indexer__SystemFilter__0=PastPerformance to restrict to a subset.
+  # Run multiple containers with different SystemFilter to shard indexing.
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile.indexer
+    container_name: sharepoint-rag-indexer
+    environment:
+      GlobalGraph__TenantId:     "${TENANT_ID}"
+      GlobalGraph__ClientId:     "${SP_CLIENT_ID}"
+      GlobalGraph__ClientSecret: "${SP_CLIENT_SECRET}"
+      AzureOpenAI__Endpoint:     "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:       "${AOAI_KEY}"
+      SharpCoreDB__DataDirectory:      "/app/data/scdb"
+      SharpCoreDB__EncryptionPassword: "${SCDB_PASSWORD}"
+      Indexer__DeltaIntervalMinutes:   "30"
+      Indexer__FullIndexIntervalHours: "24"
+      # Indexer__SystemFilter__0: "Contracts"  # uncomment to restrict
+    volumes:
+      - rag_data:/app/data
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  rag_data:
