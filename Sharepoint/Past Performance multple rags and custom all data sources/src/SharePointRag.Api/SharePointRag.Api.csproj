@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SharePointRag.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharePointRag.Core\SharePointRag.Core.csproj" />
+    <ProjectReference Include="..\SharePointRag.Agent\SharePointRag.Agent.csproj" />
+    <ProjectReference Include="..\SharePointRag.PastPerformance\SharePointRag.PastPerformance.csproj" />
+    <PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.1.0-beta.3" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi"        Version="9.0.4" />
+    <PackageReference Include="Scalar.AspNetCore"                   Version="2.5.8" />
+  </ItemGroup>
+</Project>

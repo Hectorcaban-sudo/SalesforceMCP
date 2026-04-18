@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SharePointRag.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Microsoft Agents AI -->
+    <PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.1.0-beta.3" />
+    <PackageReference Include="Microsoft.Agents.Extensions.Teams" Version="1.1.0-beta.3" />
+
+    <!-- Azure OpenAI – embeddings + chat -->
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.2.0-beta.4" />
+
+    <!-- SharePoint / Microsoft Graph -->
+    <PackageReference Include="Microsoft.Graph" Version="5.68.0" />
+    <PackageReference Include="Azure.Identity" Version="1.13.2" />
+
+    <!-- SharpCoreDB embedded encrypted DB + HNSW vector search -->
+    <PackageReference Include="SharpCoreDB"             Version="1.7.0" />
+    <PackageReference Include="SharpCoreDB.VectorSearch" Version="1.7.0" />
+
+    <!-- Resilience -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
+
+    <!-- Config & DI -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.4" />
+
+    <!-- Serialization -->
+    <PackageReference Include="System.Text.Json" Version="9.0.4" />
+  </ItemGroup>
+</Project>

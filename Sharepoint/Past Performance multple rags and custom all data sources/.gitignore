@@ -1,0 +1,25 @@
+## .NET
+bin/
+obj/
+*.user
+.vs/
+*.suo
+.vscode/
+
+## Secrets & environment
+.env
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+secrets.json
+
+## Index state
+data/
+*.json.bak
+
+## Docker
+.dockerignore
+
+## OS
+.DS_Store
+Thumbs.db
