@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SharePointRag.PastPerformance</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Inherit core RAG infrastructure (crawler, chunker, embedder, vector store) -->
+    <ProjectReference Include="..\SharePointRag.Core\SharePointRag.Core.csproj" />
+
+    <!-- Microsoft Agents SDK for the bot surface -->
+    <PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.1.0-beta.3" />
+    <PackageReference Include="Microsoft.Agents.Extensions.Teams"   Version="1.1.0-beta.3" />
+
+    <!-- Azure OpenAI (structured outputs / function calling) -->
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.2.0-beta.4" />
+
+    <!-- JSON serialization for structured extraction -->
+    <PackageReference Include="System.Text.Json" Version="9.0.4" />
+  </ItemGroup>
+</Project>
