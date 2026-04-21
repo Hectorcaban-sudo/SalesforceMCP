@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Payload_Json__c</fullName>
+    <description>Structured JSON payload. For chat mode: {"replyText":"...","updatedHistory":[...]}. For agents mode: {"responses":[{"agentName","answer"}...],"suggestions":[...],"updatedHistory":[...]}.</description>
+    <externalId>false</externalId>
+    <label>Payload JSON</label>
+    <length>131072</length>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <type>LongTextArea</type>
+    <visibleLines>15</visibleLines>
+</CustomField>
