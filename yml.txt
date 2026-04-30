@@ -1,0 +1,37 @@
+image: mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022
+
+stages:
+  - build
+
+build_docker_images:
+  stage: build
+  script:
+    - |
+      # Find all Dockerfiles in the solution
+      $dockerFiles = Get-ChildItem -Recurse -Filter "Dockerfile"
+      
+      foreach ($file in $dockerFiles) {
+          # Get the name of the parent directory
+          $folderName = $file.Directory.Name
+          
+          # Replace spaces with underscores and convert to lowercase for Docker naming conventions
+          $imageName = $folderName.Replace(" ", "_").ToLower()
+          
+          Write-Host "Found Dockerfile in $folderName. Building image: $imageName..."
+          
+          # Navigate to the directory to ensure context is correct
+          Push-Location $file.DirectoryName
+          
+          # Perform the dotnet build/publish first (optional, depending on your Dockerfile)
+          dotnet build -c Release
+          
+          # Build the Docker image
+          # Note: This requires the Docker engine to be accessible from the runner
+          docker build -t "${imageName}:latest" .
+          
+          Pop-Location
+          Write-Host "Successfully built $imageName"
+      }
+  tags:
+    - windows
+    - docker
