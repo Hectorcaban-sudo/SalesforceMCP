@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Geist', system-ui, sans-serif;
+  background: #080a0d;
+  color: #e8eaec;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle grid backdrop for the whole app */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #252a30; border-radius: 6px; border: 2px solid #080a0d; }
+::-webkit-scrollbar-thumb:hover { background: #353c44; }
+
+/* Reusable utility classes */
+.panel {
+  @apply bg-ink-900/70 border border-ink-700/60 rounded-md backdrop-blur-sm;
+}
+.panel-tight {
+  @apply bg-ink-900/70 border border-ink-700/60 rounded-md;
+}
+.btn {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md
+         border border-ink-700 bg-ink-800 hover:bg-ink-700 hover:border-ink-600
+         text-ink-100 transition-colors disabled:opacity-50 disabled:pointer-events-none;
+}
+.btn-primary {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md
+         bg-accent text-ink-950 hover:bg-accent-glow transition-colors
+         disabled:opacity-50 disabled:pointer-events-none;
+}
+.btn-danger {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md
+         border border-red-900/60 bg-red-950/40 hover:bg-red-900/40
+         text-red-200 transition-colors;
+}
+.btn-ghost {
+  @apply inline-flex items-center gap-2 px-2 py-1 text-xs font-medium rounded
+         text-ink-300 hover:text-ink-50 hover:bg-ink-800/60 transition-colors;
+}
+.input {
+  @apply w-full px-2.5 py-1.5 text-xs bg-ink-950 border border-ink-700 rounded-md
+         text-ink-100 placeholder-ink-400
+         focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30;
+}
+.input-mono {
+  @apply input font-mono;
+}
+.label {
+  @apply text-[10px] font-semibold uppercase tracking-wider text-ink-400;
+}
+.kbd {
+  @apply font-mono text-[10px] px-1.5 py-0.5 rounded border border-ink-700 bg-ink-900 text-ink-300;
+}
+.tag {
+  @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono
+         bg-ink-800 border border-ink-700 text-ink-300;
+}
+.tag-accent {
+  @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono
+         bg-accent/10 border border-accent/30 text-accent;
+}
+
+/* Animated stripe for active loading bar */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 160, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* Glow for accent dot */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 160, 0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 211, 160, 0); }
+}
+.pulse-dot { animation: pulse-glow 2s infinite; }
+
+/* Toast slide-in */
+@keyframes slide-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.slide-up { animation: slide-up 0.18s ease-out; }

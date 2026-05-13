@@ -1,0 +1,40 @@
+version: '3.9'
+
+services:
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/data
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/data
+      - ANONYMIZED_TELEMETRY=FALSE
+      # Allow the dashboard frontend (Vite dev server + built UI) to call Chroma's API directly if needed
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["http://localhost:5173","http://localhost:8090"]
+
+  backend:
+    build:
+      context: ./backend
+    container_name: chromadb-dashboard-backend
+    ports:
+      - "8765:8765"
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      - chromadb
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: chromadb-dashboard-frontend
+    ports:
+      - "8090:80"
+    depends_on:
+      - backend
+
+volumes:
+  chroma-data:
