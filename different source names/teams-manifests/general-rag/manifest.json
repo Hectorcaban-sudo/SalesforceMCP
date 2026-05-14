@@ -1,0 +1,58 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "<YOUR-RAG-TEAMS-APP-ID>",
+  "packageName": "com.yourcompany.sharepointragagent",
+
+  "developer": {
+    "name": "Your Company",
+    "websiteUrl": "https://yourcompany.com",
+    "privacyUrl": "https://yourcompany.com/privacy",
+    "termsOfUseUrl": "https://yourcompany.com/terms"
+  },
+
+  "name": {
+    "short": "SharePoint Knowledge",
+    "full": "SharePoint Knowledge Assistant"
+  },
+
+  "description": {
+    "short": "Search your SharePoint library and get grounded answers.",
+    "full": "Ask questions about your SharePoint document library. The agent retrieves relevant documents using semantic vector search and provides grounded, cited answers powered by Azure OpenAI GPT-4o."
+  },
+
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+
+  "accentColor": "#0078D4",
+
+  "bots": [
+    {
+      "botId": "<YOUR-BOT-APP-CLIENT-ID>",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            {
+              "title": "help",
+              "description": "Show usage tips"
+            },
+            {
+              "title": "status",
+              "description": "Show index status"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["*.botframework.com", "yourdomain.com"]
+}

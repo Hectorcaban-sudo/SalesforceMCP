@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SharePointRag.Agent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharePointRag.Core\SharePointRag.Core.csproj" />
+    <PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.1.0-beta.3" />
+    <PackageReference Include="Microsoft.Agents.Extensions.Teams" Version="1.1.0-beta.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.4" />
+  </ItemGroup>
+</Project>
