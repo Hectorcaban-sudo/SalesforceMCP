@@ -76,7 +76,8 @@ public record DataSourceStatus(
     int IndexedRecordCount,
     DateTimeOffset? LastFullIndex,
     DateTimeOffset? LastDeltaIndex,
-    string? ConnectionError
+    string? ConnectionError,
+    bool ReadOnly = false
 );
 
 public record RagSystemStatus(

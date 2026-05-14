@@ -40,9 +40,11 @@ namespace SharePointRag.PastPerformance.Services;
 public sealed class LlmContractExtractor(
     AzureOpenAIClient openAi,
     IOptions<AzureOpenAIOptions> aoaiOpts,
+    IOptions<SharePointRag.Core.Configuration.RagRegistryOptions> registryOpts,
     ILogger<LlmContractExtractor> logger) : IContractExtractor
 {
     private readonly AzureOpenAIOptions _aoai = aoaiOpts.Value;
+    private readonly SharePointRag.Core.Configuration.RagRegistryOptions _registry = registryOpts.Value;
 
     // Connector types treated as structured sources
     private static readonly HashSet<string> StructuredTypes =
@@ -276,16 +278,41 @@ public sealed class LlmContractExtractor(
     /// without an LLM call. Works when the connector populates standard column names.
     /// Returns null if insufficient data is present (triggering LLM fallback).
     /// </summary>
+    /// <summary>
+    /// Get the declared MetadataSchema for a data source (if configured).
+    /// Returns empty dict when no schema is declared.
+    /// </summary>
+    private IReadOnlyDictionary<string, SharePointRag.Core.Configuration.MetadataFieldDefinition>
+        GetSchema(string dataSourceName)
+    {
+        var ds = _registry.DataSources.FirstOrDefault(d => d.Name == dataSourceName);
+        return ds?.MetadataSchema
+               ?? new Dictionary<string, SharePointRag.Core.Configuration.MetadataFieldDefinition>();
+    }
+
     private static ContractRecord? TryDirectMapping(
         DocumentChunk chunk, string connectorType, string dataSourceName)
     {
         var m = chunk.Metadata;
 
+        // Also accept any field names declared in the MetadataSchema
+        // so custom column names work without code changes.
         string Get(params string[] keys)
         {
             foreach (var k in keys)
                 if (m.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v)) return v;
             return string.Empty;
+        }
+
+        // Build a lookup from schema descriptions to actual metadata keys
+        // so the extractor can find fields by semantic role.
+        // e.g. if schema says ContractNumber.Description = "Prime contract number"
+        // we still find it via the key name.
+        string GetBySchemaField(string schemaFieldName, params string[] fallbackKeys)
+        {
+            if (m.TryGetValue(schemaFieldName, out var direct) && !string.IsNullOrWhiteSpace(direct))
+                return direct;
+            return Get(fallbackKeys);
         }
 
         decimal? GetDecimal(params string[] keys)

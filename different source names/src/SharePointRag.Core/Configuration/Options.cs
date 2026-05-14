@@ -61,6 +61,39 @@ public class DataSourceDefinition
     /// </summary>
     public bool DeltaSupported { get; set; } = true;
 
+    /// <summary>
+    /// When true, this data source is managed (indexed) by an external system.
+    /// This instance will:
+    ///   - NOT build a connector, pipeline, or indexer for this source.
+    ///   - Open the vector store in read-only mode (searches work normally).
+    ///   - Block /api/index/provision, /full, and /delta for this source.
+    ///   - Report "ReadOnly (externally managed)" in status responses.
+    ///
+    /// Use when another deployment, service, or scheduled job owns ingestion
+    /// and you only want to query the already-populated store.
+    /// </summary>
+    public bool ReadOnly { get; set; } = false;
+
+    /// <summary>
+    /// Declared metadata schema for this data source.
+    /// Defines the fields that will be present in DocumentChunk.Metadata for records
+    /// from this source. Useful when:
+    ///   - The source is ReadOnly and you cannot inspect its connector.
+    ///   - You want to document the schema for consumers (API, PP agent, UI).
+    ///   - You want the ContractExtractor to know which structured fields are available.
+    ///
+    /// Key   = field name (as it appears in Metadata dictionary).
+    /// Value = MetadataFieldDefinition describing the field type, description, and examples.
+    ///
+    /// Example:
+    ///   "MetadataSchema": {
+    ///     "ContractNumber":  { "Type": "string",  "Description": "FAR contract number", "Examples": ["W912DQ-21-C-0042"] },
+    ///     "ContractAmount":  { "Type": "decimal", "Description": "Total obligated value in USD" },
+    ///     "CPARSRatingOverall": { "Type": "string", "AllowedValues": ["Exceptional","Very Good","Satisfactory","Marginal","Unsatisfactory"] }
+    ///   }
+    /// </summary>
+    public Dictionary<string, MetadataFieldDefinition> MetadataSchema { get; set; } = [];
+
     // ── Convenience helpers ───────────────────────────────────────────────────
 
     public string Get(string key, string defaultValue = "") =>
@@ -71,6 +104,55 @@ public class DataSourceDefinition
 
     public bool GetBool(string key, bool defaultValue = false) =>
         bool.TryParse(Get(key), out var b) ? b : defaultValue;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  METADATA SCHEMA DEFINITION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Declares a single metadata field that will be present in DocumentChunk.Metadata
+/// for records from a given data source.
+/// </summary>
+public class MetadataFieldDefinition
+{
+    /// <summary>
+    /// Data type of this field.
+    /// One of: string, integer, decimal, boolean, date, datetime, array.
+    /// Used by the ContractExtractor to route structured vs narrative handling.
+    /// </summary>
+    public string Type { get; set; } = "string";
+
+    /// <summary>
+    /// Human-readable description of what this field contains.
+    /// Surfaced in /api/index/registry and used by the PP agent to understand field semantics.
+    /// </summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// For string fields: the only values this field can hold.
+    /// Empty list means any value is valid.
+    /// Example: ["Exceptional","Very Good","Satisfactory","Marginal","Unsatisfactory"]
+    /// </summary>
+    public List<string> AllowedValues { get; set; } = [];
+
+    /// <summary>
+    /// Representative example values to help consumers understand the format.
+    /// Example: ["W912DQ-21-C-0042", "FA8726-20-D-0001"]
+    /// </summary>
+    public List<string> Examples { get; set; } = [];
+
+    /// <summary>
+    /// Whether this field is guaranteed to be present on every record from this source.
+    /// False = field may be absent or empty on some records.
+    /// </summary>
+    public bool Required { get; set; } = false;
+
+    /// <summary>
+    /// Whether this field should be surfaced in contract extraction and search results.
+    /// Set false to suppress internal/technical fields from UI display.
+    /// </summary>
+    public bool Searchable { get; set; } = true;
 }
 
 // ── Well-known property key constants per connector type ──────────────────────

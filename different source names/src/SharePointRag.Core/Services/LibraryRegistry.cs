@@ -58,11 +58,22 @@ public sealed class LibraryRegistry : ILibraryRegistry
 
         logger.LogInformation("Vector store backend: {Provider}", _vsOpts.Provider);
 
-        // ── 1. Build one connector per data source ────────────────────────────
+        // ── 1. Build one connector per writable data source ──────────────────
+        // ReadOnly sources skip connector creation — they are indexed externally.
+        // Their vector stores are still opened so searches work normally.
         foreach (var ds in _config.DataSources)
         {
-            _connectors[ds.Name] = connectorRegistry.Resolve(ds);
-            logger.LogInformation("Registered data source '{Name}' ({Type})", ds.Name, ds.Type);
+            if (ds.ReadOnly)
+            {
+                logger.LogInformation(
+                    "Data source '{Name}' ({Type}) is ReadOnly — skipping connector, pipeline will not ingest it",
+                    ds.Name, ds.Type);
+            }
+            else
+            {
+                _connectors[ds.Name] = connectorRegistry.Resolve(ds);
+                logger.LogInformation("Registered data source '{Name}' ({Type})", ds.Name, ds.Type);
+            }
         }
 
         // ── 2. State store root (always JSON on disk, same path regardless of backend) ─
@@ -100,17 +111,29 @@ public sealed class LibraryRegistry : ILibraryRegistry
             var state = new JsonFileIndexStateStore(sys.Name, stateDir, stateLogger);
             _states[sys.Name] = state;
 
-            // Pipeline: each connector gets its own per-source store for writing
-            var sources = sys.DataSourceNames.Select(n =>
-            {
-                var ds        = _config.DataSources.First(d => d.Name == n);
-                var connector = _connectors[n];
-                var store     = sourceStoreMap[n];   // per-source store, not composite
-                return (ds, connector, store);
-            }).ToList();
+            // Pipeline: only writable (non-ReadOnly) sources are indexed.
+            // ReadOnly sources' stores are open for search but never written to by this instance.
+            var writableSources = sys.DataSourceNames
+                .Where(n => !_config.DataSources.First(d => d.Name == n).ReadOnly)
+                .Select(n =>
+                {
+                    var ds        = _config.DataSources.First(d => d.Name == n);
+                    var connector = _connectors[n];
+                    var store     = sourceStoreMap[n];
+                    return (ds, connector, store);
+                }).ToList();
+
+            var readOnlySourceNames = sys.DataSourceNames
+                .Where(n => _config.DataSources.First(d => d.Name == n).ReadOnly)
+                .ToList();
+
+            if (readOnlySourceNames.Count > 0)
+                logger.LogInformation(
+                    "System '{Sys}': {N} read-only source(s) [{DS}] — stores opened for search only",
+                    sys.Name, readOnlySourceNames.Count, string.Join(", ", readOnlySourceNames));
 
             _pipelines[sys.Name] = new PerSourceIndexingPipeline(
-                sys, sources, extractor, chunker, embedder, state, pipelineLogger);
+                sys, writableSources, extractor, chunker, embedder, state, pipelineLogger);
 
             logger.LogInformation(
                 "Registered RAG system '{Sys}' ← [{Sources}]",
@@ -171,19 +194,48 @@ public sealed class LibraryRegistry : ILibraryRegistry
                 var last      = await state.GetLastFullIndexTimeAsync(dsName, ct);
 
                 string connInfo;
-                try   { connInfo = await connector.TestConnectionAsync(ct); }
-                catch (Exception ex) { connInfo = $"Error: {ex.Message}"; }
+                bool   isReachable;
+                string? connError;
+
+                if (ds.ReadOnly)
+                {
+                    // No connector for read-only sources — report that clearly
+                    connInfo   = "ReadOnly — externally managed, no connector in this instance";
+                    isReachable = true;   // store is open; we just don't own ingestion
+                    connError  = null;
+                }
+                else if (_connectors.TryGetValue(dsName, out var connector))
+                {
+                    try
+                    {
+                        connInfo   = await connector.TestConnectionAsync(ct);
+                        isReachable = !connInfo.StartsWith("Error:") && !connInfo.StartsWith("Connection failed:");
+                        connError  = isReachable ? null : connInfo;
+                    }
+                    catch (Exception ex)
+                    {
+                        connInfo   = $"Error: {ex.Message}";
+                        isReachable = false;
+                        connError  = connInfo;
+                    }
+                }
+                else
+                {
+                    connInfo   = "No connector registered";
+                    isReachable = false;
+                    connError  = connInfo;
+                }
 
                 dsStatuses.Add(new DataSourceStatus(
                     DataSourceName:     dsName,
                     ConnectorType:      ds.Type.ToString(),
                     ConnectionInfo:     connInfo,
-                    IsReachable:        !connInfo.StartsWith("Error:") && !connInfo.StartsWith("Connection failed:"),
+                    IsReachable:        isReachable,
                     IndexedRecordCount: count,
                     LastFullIndex:      last,
                     LastDeltaIndex:     null,
-                    ConnectionError:    connInfo.StartsWith("Error:") || connInfo.StartsWith("Connection failed:")
-                                        ? connInfo : null));
+                    ConnectionError:    connError,
+                    ReadOnly:           ds.ReadOnly));
             }
 
             result.Add(new RagSystemStatus(sys.Name, sys.Description, healthy, dsStatuses));

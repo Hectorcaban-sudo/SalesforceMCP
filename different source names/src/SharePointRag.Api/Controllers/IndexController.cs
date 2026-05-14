@@ -48,8 +48,7 @@ public sealed class IndexController(
     // ── Per-source store listing ─────────────────────────────────────────────────
 
     /// <summary>
-    /// List all per-source vector stores: each system × data source pair has its own
-    /// isolated store with its own metadata schema.
+    /// List all per-source vector stores with their read/write mode and metadata schema summary.
     /// Filter by ?system= to see stores for a specific system only.
     /// </summary>
     [HttpGet("stores")]
@@ -69,15 +68,59 @@ public sealed class IndexController(
             {
                 var ds = registry.GetDataSource(dsName);
                 result.Add(new SourceStoreInfo(
-                    SystemName:    sysName,
-                    DataSourceName: dsName,
-                    ConnectorType: ds.Type.ToString(),
-                    StoreName:     $"{sysName}__{dsName}"
+                    SystemName:      sysName,
+                    DataSourceName:  dsName,
+                    ConnectorType:   ds.Type.ToString(),
+                    StoreName:       $"{sysName}__{dsName}",
+                    ReadOnly:        ds.ReadOnly,
+                    SchemaFieldCount: ds.MetadataSchema.Count
                 ));
             }
         }
 
         return Ok(result);
+    }
+
+    // ── Metadata schema ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Return the declared metadata schema for a specific data source.
+    /// The schema documents which fields appear in DocumentChunk.Metadata,
+    /// their types, allowed values, and descriptions.
+    /// Especially useful for read-only sources where no connector can be introspected.
+    /// </summary>
+    [HttpGet("schema/{dataSourceName}")]
+    [ProducesResponseType<DataSourceSchemaResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult GetSchema(string dataSourceName)
+    {
+        try
+        {
+            var ds = registry.GetDataSource(dataSourceName);
+            var fields = ds.MetadataSchema.ToDictionary(
+                kv => kv.Key,
+                kv => new MetadataFieldDto(
+                    kv.Value.Type,
+                    kv.Value.Description,
+                    kv.Value.AllowedValues,
+                    kv.Value.Examples,
+                    kv.Value.Required,
+                    kv.Value.Searchable));
+
+            return Ok(new DataSourceSchemaResponse(
+                DataSourceName: dataSourceName,
+                ConnectorType:  ds.Type.ToString(),
+                ReadOnly:       ds.ReadOnly,
+                Fields:         fields,
+                Message:        fields.Count == 0
+                    ? "No schema declared. Add MetadataSchema to this data source in appsettings."
+                    : $"{fields.Count} field(s) declared."
+            ));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = $"Data source '{dataSourceName}' not found." });
+        }
     }
 
     // ── Registry definition ───────────────────────────────────────────────────
@@ -109,12 +152,24 @@ public sealed class IndexController(
                 .Where(kv => !IsSensitiveKey(kv.Key))
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
 
+            var schemaDto = ds.MetadataSchema.ToDictionary(
+                kv => kv.Key,
+                kv => new MetadataFieldDto(
+                    kv.Value.Type,
+                    kv.Value.Description,
+                    kv.Value.AllowedValues,
+                    kv.Value.Examples,
+                    kv.Value.Required,
+                    kv.Value.Searchable));
+
             return new DataSourceDefinitionDto(
                 ds.Name,
                 ds.Type.ToString(),
                 safeProps,
                 ds.CrawlParallelism,
-                ds.DeltaSupported);
+                ds.DeltaSupported,
+                ds.ReadOnly,
+                schemaDto);
         }).ToList();
 
         return Ok(new RegistryDefinitionResponse(systems, dataSources));
@@ -192,9 +247,9 @@ public sealed class IndexController(
     // ── Full index ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Trigger a full re-index of all data sources assigned to the specified system(s).
-    /// Long-running — returns 202 immediately. Monitor logs for progress.
-    /// Supports SharePoint, SQL, Excel, Deltek, and Custom sources.
+    /// Trigger a full re-index of all WRITABLE data sources in the specified system(s).
+    /// Read-only sources are skipped — they are indexed by another system.
+    /// Long-running — returns 202 immediately.
     /// </summary>
     [HttpPost("full")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
@@ -202,7 +257,9 @@ public sealed class IndexController(
         [FromQuery] string? system,
         CancellationToken ct)
     {
-        var names = ResolveSystemNames(system);
+        var names         = ResolveSystemNames(system);
+        var readOnlyWarns = GetReadOnlyWarnings(names);
+
         logger.LogInformation("Full index triggered for: [{S}]", string.Join(", ", names));
 
         _ = Task.Run(async () =>
@@ -212,14 +269,19 @@ public sealed class IndexController(
                 catch (Exception ex) { logger.LogError(ex, "Full index failed: '{S}'", name); }
         }, ct);
 
-        return Accepted(new { message = "Full index started.", systems = names });
+        return Accepted(new
+        {
+            message  = "Full index started (read-only sources skipped).",
+            systems  = names,
+            warnings = readOnlyWarns
+        });
     }
 
     // ── Delta index ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Trigger an incremental re-index (records modified since last full run).
-    /// Sources with DeltaSupported=false fall back to a full re-index automatically.
+    /// Trigger an incremental re-index of WRITABLE sources (modified since last full run).
+    /// Read-only sources are skipped. Sources with DeltaSupported=false fall back to full.
     /// </summary>
     [HttpPost("delta")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
@@ -227,7 +289,9 @@ public sealed class IndexController(
         [FromQuery] string? system,
         CancellationToken ct)
     {
-        var names = ResolveSystemNames(system);
+        var names         = ResolveSystemNames(system);
+        var readOnlyWarns = GetReadOnlyWarnings(names);
+
         logger.LogInformation("Delta index triggered for: [{S}]", string.Join(", ", names));
 
         _ = Task.Run(async () =>
@@ -237,13 +301,38 @@ public sealed class IndexController(
                 catch (Exception ex) { logger.LogError(ex, "Delta index failed: '{S}'", name); }
         }, ct);
 
-        return Accepted(new { message = "Delta index started.", systems = names });
+        return Accepted(new
+        {
+            message  = "Delta index started (read-only sources skipped).",
+            systems  = names,
+            warnings = readOnlyWarns
+        });
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private List<string> ResolveSystemNames(string? system) =>
         system is not null ? [system] : [.. registry.SystemNames];
+
+    /// <summary>Collect human-readable warnings for any read-only sources in the given systems.</summary>
+    private List<string> GetReadOnlyWarnings(IEnumerable<string> systemNames)
+    {
+        var warnings = new List<string>();
+        foreach (var sysName in systemNames)
+        {
+            try
+            {
+                var sys = registry.GetSystem(sysName);
+                var readOnly = sys.DataSourceNames
+                    .Where(n => registry.GetDataSource(n).ReadOnly)
+                    .ToList();
+                foreach (var ds in readOnly)
+                    warnings.Add($"[{sysName}] '{ds}' is ReadOnly — skipped (indexed externally).");
+            }
+            catch { /* system not found — pipeline will handle */ }
+        }
+        return warnings;
+    }
 
     private static bool IsSensitiveKey(string key) =>
         key.Contains("Secret",   StringComparison.OrdinalIgnoreCase) ||
@@ -275,11 +364,23 @@ public record SystemDefinitionDto(
 );
 
 public record DataSourceDefinitionDto(
-    string                      Name,
-    string                      ConnectorType,
-    Dictionary<string, string>  Properties,         // sensitive keys masked
-    int                         CrawlParallelism,
-    bool                        DeltaSupported
+    string                                Name,
+    string                                ConnectorType,
+    Dictionary<string, string>            Properties,     // sensitive keys masked
+    int                                   CrawlParallelism,
+    bool                                  DeltaSupported,
+    bool                                  ReadOnly,
+    Dictionary<string, MetadataFieldDto>  MetadataSchema
+);
+
+/// <summary>Describes a single metadata field declared on a data source.</summary>
+public record MetadataFieldDto(
+    string       Type,
+    string       Description,
+    List<string> AllowedValues,
+    List<string> Examples,
+    bool         Required,
+    bool         Searchable
 );
 
 public record ConnectionTestResult(
