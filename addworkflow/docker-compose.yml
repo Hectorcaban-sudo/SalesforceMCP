@@ -1,0 +1,108 @@
+version: "3.9"
+
+# Multi-source RAG system with LiteGraph persistent graph + vector store.
+# LiteGraph is embedded (SQLite) — no external database server required.
+# One SQLite file (litegraph.db) holds all RAG system graphs.
+# Each RAG system is isolated as its own Graph inside a shared Tenant.
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: sharepoint-rag-api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+
+      # Global Graph (SharePoint fallback credentials)
+      GlobalGraph__TenantId:     "${TENANT_ID}"
+      GlobalGraph__ClientId:     "${SP_CLIENT_ID}"
+      GlobalGraph__ClientSecret: "${SP_CLIENT_SECRET}"
+
+      # Azure OpenAI
+      AzureOpenAI__Endpoint: "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:   "${AOAI_KEY}"
+
+      # Vector store backend: LiteGraph (embedded, default) or Chroma (external server)
+      # To use Chroma: set VectorStore__Provider=Chroma and start the chroma service below.
+      VectorStore__Provider: "LiteGraph"
+
+      # LiteGraph — active when VectorStore__Provider = LiteGraph
+      LiteGraph__DatabasePath:   "/app/data/litegraph.db"
+      LiteGraph__TenantName:     "RAGSystem"
+      LiteGraph__EmbeddingModel: "text-embedding-3-large"
+
+      # Chroma — active when VectorStore__Provider = Chroma
+      # Point to the chroma service defined below (or a remote Chroma Cloud endpoint).
+      # Chroma__Endpoint:         "http://chroma:8000/api/v1/"
+      # Chroma__ApiKey:           ""
+      # Chroma__CollectionPrefix: "rag_"
+
+      # Bot Framework
+      AgentAuthentication__ClientId:     "${BOT_CLIENT_ID}"
+      AgentAuthentication__ClientSecret: "${BOT_CLIENT_SECRET}"
+      AgentAuthentication__TenantId:     "${TENANT_ID}"
+
+      # SQL data source credentials (set per data source in config or here)
+      # RagRegistry__DataSources__2__Properties__ConnectionString: "${COSTPOINT_CONN_STR}"
+      # Deltek credentials
+      # RagRegistry__DataSources__3__Properties__ApiKey: "${DELTEK_TOKEN}"
+
+    volumes:
+      - rag_data:/app/data       # litegraph.db lives here
+      - excel_data:/mnt/shared   # optional: mount Excel/CSV share
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile.indexer
+    container_name: sharepoint-rag-indexer
+    environment:
+      GlobalGraph__TenantId:     "${TENANT_ID}"
+      GlobalGraph__ClientId:     "${SP_CLIENT_ID}"
+      GlobalGraph__ClientSecret: "${SP_CLIENT_SECRET}"
+      AzureOpenAI__Endpoint:     "${AOAI_ENDPOINT}"
+      AzureOpenAI__ApiKey:       "${AOAI_KEY}"
+      LiteGraph__DatabasePath:   "/app/data/litegraph.db"
+      LiteGraph__TenantName:     "RAGSystem"
+      LiteGraph__EmbeddingModel: "text-embedding-3-large"
+      Indexer__DeltaIntervalMinutes:   "30"
+      Indexer__FullIndexIntervalHours: "24"
+      # Indexer__SystemFilter__0: "Contracts"   # uncomment to restrict this worker
+    volumes:
+      - rag_data:/app/data
+      - excel_data:/mnt/shared
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ── ChromaDB server (optional) ────────────────────────────────────────────────
+  # Uncomment this service and set VectorStore__Provider=Chroma in api + indexer
+  # to switch from LiteGraph (embedded) to ChromaDB (external HTTP server).
+  #
+  # chroma:
+  #   image: chromadb/chroma:latest
+  #   container_name: sharepoint-rag-chroma
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - chroma_data:/chroma/chroma
+  #   environment:
+  #     IS_PERSISTENT: "TRUE"
+  #     ANONYMIZED_TELEMETRY: "FALSE"
+  #   restart: unless-stopped
+
+volumes:
+  rag_data:    # Shared volume: litegraph.db + index-state.json files
+  excel_data:  # Optional: mount your Excel / CSV file share here
+  # chroma_data:  # Uncomment when using Chroma backend
