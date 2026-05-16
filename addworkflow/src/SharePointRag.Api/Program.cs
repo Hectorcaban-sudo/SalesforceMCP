@@ -1,5 +1,8 @@
+using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.Builder;
 using Microsoft.Agents.Hosting.AspNetCore;
+using Microsoft.Extensions.DependencyInjection;
 using Scalar.AspNetCore;
 using SharePointRag.Agent;
 using SharePointRag.Core.Extensions;
@@ -23,53 +26,53 @@ builder.Logging
     .AddDebug();
 
 // ── Core RAG infrastructure ───────────────────────────────────────────────────
-// Reads RagRegistry from configuration and builds:
-//   • One IDataSourceConnector per data source
-//   • One IVectorStore        per system  (isolated LiteGraph Graph in shared SQLite)
-//   • One IIndexStateStore    per system
-//   • One IIndexingPipeline   per system  (fans across its assigned libraries)
-//   • ILibraryRegistry        (central lookup)
-//   • IRagOrchestratorFactory (creates multi-system orchestrators on demand)
 builder.Services.AddSharePointRag(builder.Configuration);
 
 // ── Per-agent options ─────────────────────────────────────────────────────────
-// Each agent declares which RAG systems it covers via its own options section.
-// All names must match RagRegistry.Systems[*].Name in appsettings.
 builder.Services.Configure<SharePointRagAgentOptions>(
     builder.Configuration.GetSection(SharePointRagAgentOptions.SectionName));
 
-// ── Past Performance Agent layer ──────────────────────────────────────────────
+// ── Past Performance — domain services + stateless bot ───────────────────────
+// Registers: IPastPerformanceOrchestrator, IQueryParser, IContractExtractor,
+//            IRelevanceScorer, IProposalDrafter, IPluginRouter
 builder.Services.AddPastPerformanceAgent(builder.Configuration);
 
-// ── Microsoft.Agents SDK ──────────────────────────────────────────────────────
+// ── Past Performance — MAF Workflow services ──────────────────────────────────
+// Registers: PPOrchestratorChatClient, IChatClient (Azure OpenAI as IChatClient)
+// The workflow graph itself is built below using builder.AddWorkflow().
+builder.Services.AddPastPerformanceWorkflow(builder.Configuration);
+
+// ── Microsoft.Agents SDK — Bot Framework adapter (stateless bots) ─────────────
 builder.Services.AddAgentAspNetAuthentication(builder.Configuration);
 
-// General SharePoint RAG bot
-// Searches the systems listed in SharePointRagAgent.SystemNames (default: ["General"])
+// General SharePoint RAG bot (old SDK — AgentApplication)
 builder.Services.AddAgent<SharePointRagAgent>(ab =>
     ab.WithOptions(o => o.StartTypingTimer = false));
 
-// Past Performance specialist bot (stateless, AgentApplication)
-// Searches the systems listed in PastPerformanceAgent.SystemNames
+// Past Performance specialist bot — stateless (old SDK — AgentApplication)
 builder.Services.AddAgent<PastPerformanceAgent>("pastperformance", ab =>
     ab.WithOptions(o => o.StartTypingTimer = false));
 
-// Past Performance workflow bot (stateful, multi-turn, AgentApplication subclass)
-// Parallel implementation — same services, persistent conversation state across turns.
-// Endpoint: POST /api/pastperformance/workflow/messages
-builder.Services.AddPastPerformanceWorkflow();
-builder.Services.AddAgent<PastPerformanceWorkflow>("ppworkflow", ab =>
-    ab.WithOptions(o => o.StartTypingTimer = false));
+// ── Microsoft.Agents.AI.Workflows — proper MAF workflow ──────────────────────
+//
+// The Past Performance Workflow is built as a 3-step sequential graph:
+//   QueryParserAgent → PPOrchestratorAgent → ResponseFormatterAgent
+//
+// builder.AddWorkflow()   — registers the Workflow in the MAF hosting layer
+// .AddAsAIAgent()         — converts the Workflow to an AIAgent keyed "pp-workflow"
+//                           so PPWorkflowController can resolve it from DI
+//
+// Session state is managed by AgentSession (multi-turn, serialisable).
+// Endpoint: POST /api/pastperformance/workflow/run  (PPWorkflowController)
+builder.AddWorkflow("pp-workflow", PastPerformanceWorkflowFactory.Build)
+       .AddAsAIAgent();
 
 // ── API ───────────────────────────────────────────────────────────────────────
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks()
     .AddCheck("registry", () =>
-    {
-        // Light health check — registry was built successfully if we get here
-        return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("Registry OK");
-    });
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("Registry OK"));
 
 var app = builder.Build();
 
@@ -84,13 +87,13 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// ── Bot endpoints ─────────────────────────────────────────────────────────────
+// ── Bot Framework endpoints (old SDK — stateless AgentApplication bots) ───────
 // General SharePoint RAG bot
 app.MapPost("/api/messages", async (
     HttpContext ctx, IAgentHttpAdapter adapter, IAgent agent, CancellationToken ct) =>
     await adapter.ProcessAsync(ctx.Request, ctx.Response, agent, ct));
 
-// Past Performance specialist bot — stateless (AgentApplication)
+// Past Performance stateless bot
 app.MapPost("/api/pastperformance/messages", async (
     HttpContext ctx, IAgentHttpAdapter adapter, CancellationToken ct) =>
 {
@@ -98,14 +101,11 @@ app.MapPost("/api/pastperformance/messages", async (
     await adapter.ProcessAsync(ctx.Request, ctx.Response, ppAgent, ct);
 });
 
-// Past Performance workflow bot — stateful multi-turn (AgentApplication subclass)
-// Maintains conversation context: cached contracts, current draft, history.
-app.MapPost("/api/pastperformance/workflow/messages", async (
-    HttpContext ctx, IAgentHttpAdapter adapter, CancellationToken ct) =>
-{
-    var wfAgent = ctx.RequestServices.GetRequiredKeyedService<IAgent>("ppworkflow");
-    await adapter.ProcessAsync(ctx.Request, ctx.Response, wfAgent, ct);
-});
+// ── MAF Workflow endpoint (new SDK — routed via PPWorkflowController) ─────────
+// POST /api/pastperformance/workflow/run    — single-turn + session management
+// POST /api/pastperformance/workflow/stream — streaming Server-Sent Events
+// DELETE /api/pastperformance/workflow/session/{id} — clear session
+// (Routes are declared in PPWorkflowController via [Route("api/pastperformance/workflow")])
 
 // ── REST + infrastructure ─────────────────────────────────────────────────────
 app.MapHealthChecks("/health");

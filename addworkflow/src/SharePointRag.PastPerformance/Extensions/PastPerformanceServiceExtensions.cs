@@ -1,5 +1,6 @@
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -94,25 +95,45 @@ public static class PastPerformanceServiceExtensions
     }
 
     /// <summary>
-    /// Registers the AgentWorkflow-based Past Performance Agent as a parallel
-    /// implementation alongside the existing PastPerformanceAgent.
+    /// Registers services required by the <c>Microsoft.Agents.AI.Workflows</c>-based
+    /// Past Performance Workflow alongside the existing stateless PastPerformanceAgent.
     ///
-    /// Uses the same IPastPerformanceOrchestrator, IQueryParser, IContractExtractor,
-    /// IRelevanceScorer, and IProposalDrafter — no duplicate service registrations.
-    /// The only addition is PastPerformanceWorkflow itself.
+    /// What this registers:
+    ///   - <see cref="PPOrchestratorChatClient"/> — adapts IPastPerformanceOrchestrator
+    ///     to IChatClient so it can be a workflow node via chatClient.AsAIAgent()
+    ///   - IChatClient (if not already registered) — Azure OpenAI client for the
+    ///     QueryParserAgent and ResponseFormatterAgent steps
     ///
-    /// Called from Program.cs AFTER AddPastPerformanceAgent():
-    ///   builder.Services.AddAgent&lt;PastPerformanceWorkflow&gt;("ppworkflow", ...);
+    /// The workflow itself is built via builder.AddWorkflow() in Program.cs using
+    /// <see cref="PastPerformanceWorkflowFactory.Build"/> and then exposed as an
+    /// AIAgent via .AddAsAIAgent().
     ///
-    /// Exposed on: POST /api/pastperformance/workflow/messages
+    /// Endpoint: POST /api/pastperformance/workflow/run  (PPWorkflowController)
+    ///           POST /api/pastperformance/workflow/stream (streaming SSE)
+    ///
+    /// All PP domain services (orchestrator, extractor, scorer, drafter) are already
+    /// registered by AddPastPerformanceAgent() — no duplication here.
     /// </summary>
     public static IServiceCollection AddPastPerformanceWorkflow(
-        this IServiceCollection services)
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
-        // The workflow class itself — all its dependencies (orchestrator, parser,
-        // extractor, scorer, drafter) are already registered by AddPastPerformanceAgent().
-        // Microsoft.Agents SDK AddAgent<T>() handles the rest via Program.cs.
-        services.AddTransient<SharePointRag.PastPerformance.Workflow.PastPerformanceWorkflow>();
+        // IChatClient — Azure OpenAI as IChatClient for all ChatClientAgent nodes.
+        // Used by RouterAgent + all sub-workflow agents (ContractFinder, NarrativeDrafter, etc.)
+        // This uses Azure.AI.OpenAI's AsIChatClient() extension which makes the
+        // AzureOpenAIClient's ChatClient conform to Microsoft.Extensions.AI.IChatClient.
+        // Guard: only register if not already registered by another component.
+        services.TryAddSingleton<Microsoft.Extensions.AI.IChatClient>(sp =>
+        {
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                SharePointRag.Core.Configuration.AzureOpenAIOptions>>().Value;
+            return new Azure.AI.OpenAI.AzureOpenAIClient(
+                    new Uri(opts.Endpoint),
+                    new Azure.AzureKeyCredential(opts.ApiKey))
+                .GetChatClient(opts.ChatDeployment)
+                .AsIChatClient();
+        });
+
         return services;
     }
 

@@ -10,9 +10,17 @@
     <!-- Inherit core RAG infrastructure (crawler, chunker, embedder, vector store) -->
     <ProjectReference Include="..\SharePointRag.Core\SharePointRag.Core.csproj" />
 
-    <!-- Microsoft Agents SDK for the bot surface -->
+    <!-- Microsoft Agents SDK — existing Teams bot surface (PastPerformanceAgent, SharePointRagAgent) -->
     <PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.1.0-beta.3" />
     <PackageReference Include="Microsoft.Agents.Extensions.Teams"   Version="1.1.0-beta.3" />
+
+    <!-- Microsoft Agent Framework — proper Workflow API (PastPerformanceWorkflow) -->
+    <!-- Package: Microsoft.Agents.AI.Workflows                                        -->
+    <!-- Provides: WorkflowBuilder, AgentWorkflowBuilder, Workflow, AgentSession,      -->
+    <!--           AIAgent, ChatClientAgent, ChatClientAgentOptions                     -->
+    <PackageReference Include="Microsoft.Agents.AI"          Version="0.1.0-preview" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="0.1.0-preview" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting"   Version="0.1.0-preview" />
 
     <!-- Azure OpenAI (structured outputs / function calling) -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.2.0-beta.4" />

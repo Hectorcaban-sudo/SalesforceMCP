@@ -4,12 +4,34 @@ using SharePointRag.PastPerformance.Models;
 namespace SharePointRag.PastPerformance.Interfaces;
 
 /// <summary>
+/// Runtime context passed to IQueryParser so GPT-4o knows which data sources
+/// and connector types are actually available in this deployment. Without this,
+/// the model has to guess source names from training data alone.
+/// </summary>
+public record AvailableSourcesContext(
+    /// <summary>Named data sources the PP agent can actually search (e.g. "DeltekVantagepoint").</summary>
+    IReadOnlyList<string> DataSourceNames,
+    /// <summary>Connector types present (e.g. "SharePoint", "SqlDatabase", "Deltek", "Excel").</summary>
+    IReadOnlyList<string> ConnectorTypes,
+    /// <summary>RAG system names the PP agent covers.</summary>
+    IReadOnlyList<string> SystemNames
+);
+
+/// <summary>
 /// Parses a natural-language question into a structured PastPerformanceQuery,
 /// extracting intent, filters, and semantic search text via LLM.
 /// </summary>
 public interface IQueryParser
 {
-    Task<PastPerformanceQuery> ParseAsync(string rawQuestion, CancellationToken ct = default);
+    /// <summary>
+    /// Parse the user question. When <paramref name="sources"/> is provided, the
+    /// parser prompt includes the actual data source names available at runtime so
+    /// GPT-4o can produce accurate DataSourceFilter and ConnectorTypeFilter values.
+    /// </summary>
+    Task<PastPerformanceQuery> ParseAsync(
+        string rawQuestion,
+        AvailableSourcesContext? sources = null,
+        CancellationToken ct = default);
 }
 
 /// <summary>
