@@ -27,7 +27,7 @@ const ALLOWED_TAGS = new Set([
 ]);
 
 // Per-tag allowed attributes. Anything not listed is stripped.
-const ALLOWED_ATTRS = {
+const ALLOWED_ATTRS = { 
     A: ['href', 'title'],
 };
 
