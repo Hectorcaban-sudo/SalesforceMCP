@@ -121,13 +121,17 @@ async function getTopicSchema(client, meta, topic) {
  *
  * Replace the stub with a real LLM call (OpenAI, Anthropic, Einstein, etc.).
  */
-async function handleChat({ userMessage, history }) {
+async function handleChat({ userMessage, history, recordId, objectApiName }) {
     const newHistory = [...history, { role: 'user', content: userMessage }];
+
+    // Record context is available here for grounding the LLM prompt, e.g.:
+    //   if (objectApiName) systemPrompt += `User is viewing a ${objectApiName} (Id: ${recordId}).`;
 
     // TODO: replace with your LLM client
     // const completion = await llm.chat({ messages: newHistory });
     // const replyText  = completion.choices[0].message.content;
-    const replyText = `(stub) You said: "${userMessage}". Wire handleChat() to your LLM.`;
+    const contextNote = objectApiName ? ` (on ${objectApiName} ${recordId})` : '';
+    const replyText = `(stub) You said: "${userMessage}"${contextNote}. Wire handleChat() to your LLM.`;
 
     newHistory.push({ role: 'assistant', content: replyText });
     return { replyText, updatedHistory: newHistory };
@@ -140,12 +144,14 @@ async function handleChat({ userMessage, history }) {
  *
  * Replace routeToAgents() with your real agent orchestrator.
  */
-async function handleAgents({ userMessage, history }) {
+async function handleAgents({ userMessage, history, recordId, objectApiName }) {
     const newHistory = [...history, { role: 'user', content: userMessage }];
 
     // TODO: swap for a real orchestrator (LangGraph, Einstein Agents, etc.).
+    // recordId / objectApiName let you bias routing — e.g. default to the
+    // OpportunitiesAgent when objectApiName === 'Opportunity'.
     // Expected shape: [{ agentName, answer }...]
-    const responses = await routeToAgents(userMessage, newHistory);
+    const responses = await routeToAgents(userMessage, newHistory, { recordId, objectApiName });
 
     // Combine agent answers into a single assistant turn so future LLM calls
     // see a coherent history.
@@ -156,10 +162,12 @@ async function handleAgents({ userMessage, history }) {
     return { responses, suggestions, updatedHistory: newHistory };
 }
 
-async function routeToAgents(userMessage /*, history */) {
+async function routeToAgents(userMessage, history, recordContext = {}) {
     // Stub: pretend Accounts always has an opinion.
+    const { objectApiName } = recordContext;
+    const ctxNote = objectApiName ? ` [context: ${objectApiName}]` : '';
     return [
-        { agentName: 'AccountsAgent', answer: `(stub) Accounts agent received: "${userMessage}"` },
+        { agentName: 'AccountsAgent', answer: `(stub) Accounts agent received: "${userMessage}"${ctxNote}` },
     ];
 }
 
@@ -207,6 +215,9 @@ async function processEvent(client, meta, decoded) {
     const mode           = decoded.Mode__c;
     const userMessage    = decoded.User_Message__c;
     const historyJson    = decoded.History_Json__c || '[]';
+    // Record context — present when the chat was launched from a record page.
+    const recordId       = decoded.Record_Id__c || null;
+    const objectApiName  = decoded.Object_Api_Name__c || null;
 
     let history = [];
     try {
@@ -216,10 +227,12 @@ async function processEvent(client, meta, decoded) {
         history = [];
     }
 
+    const ctx = { userMessage, history, recordId, objectApiName };
+
     try {
         const result = mode === 'agents'
-            ? await handleAgents({ userMessage, history })
-            : await handleChat({ userMessage, history });
+            ? await handleAgents(ctx)
+            : await handleChat(ctx);
 
         await publishResponse(client, meta, {
             conversationId,

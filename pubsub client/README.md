@@ -47,6 +47,42 @@ external-subscriber/
 └── PROTO_FILE.md                   How to obtain pubsub_api.proto
 ```
 
+## Features
+
+### Rich message rendering
+Bot responses are rendered through `messageFormatter.js`, a small allowlist
+sanitizer used by the `formattedMessage` child component:
+
+- **HTML markup** in responses (e.g. `<b>`, `<ul>`, `<a>`, `<code>`, tables) is
+  displayed correctly, restricted to a safe tag/attribute allowlist.
+- **Bare URLs** (both `https://…` and `www.…`) are auto-linked with
+  `target="_blank" rel="noopener noreferrer"`.
+- **Line breaks** are preserved (newlines → `<br>`).
+- **XSS is blocked**: `<script>`, event handlers like `onerror`, and
+  `javascript:` hrefs are stripped. Rendering uses `lwc:dom="manual"` on a
+  container the component owns, only after sanitization.
+
+### Maximize / restore
+A maximize button sits next to minimize in the header. Maximized, the window
+grows to 80% width (max 1100px) and nearly full height, centered over the
+Salesforce UI behind a dimmed backdrop. The backdrop and window are offset from
+the top so the **Salesforce global navigation header stays visible**. Clicking
+the backdrop or the restore button returns to the docked size.
+
+### Record-aware prompts
+When placed on a record page, the component reads `@api recordId` and
+`@api objectApiName` (auto-populated by the Lightning runtime) and shows
+object-specific welcome prompts (Opportunity, Account, Case, Contact, Lead,
+Contract). Off record pages it falls back to generic prompts. The record
+context is also sent to the backend on every request via `Record_Id__c` and
+`Object_Api_Name__c`.
+
+> **Dynamic prompt hook:** prompts are currently static, keyed by object API
+> name in `RECORD_PROMPTS` (see `einsteinChat.js`). To make them data-driven,
+> replace the lookup in the `recordPrompts` getter with logic that interpolates
+> live field values — the UI renders whatever array `suggestions` returns, so
+> only that getter changes.
+
 ## Platform event schema
 
 ### `Einstein_Chat_Request__e` (published by LWC, consumed by subscriber)
@@ -58,6 +94,8 @@ external-subscriber/
 | `User_Message__c` | LongText(32K) | The current turn's user message. |
 | `History_Json__c` | LongText(128K) | Prior turns as JSON `[{role, content}...]`. |
 | `User_Id__c` | Text(18) | Stamped server-side from `UserInfo.getUserId()`. |
+| `Record_Id__c` | Text(18) | ID of the record the chat runs on (null off record pages). |
+| `Object_Api_Name__c` | Text(64) | SObject API name, e.g. `Opportunity` (null off record pages). |
 
 ### `Einstein_Chat_Response__e` (published by subscriber, consumed by LWC)
 

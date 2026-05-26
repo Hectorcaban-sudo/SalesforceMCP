@@ -33,7 +33,9 @@ public with sharing class EinsteinChatPublisher {
         String conversationId,
         String mode,
         String userMessage,
-        String historyJson
+        String historyJson,
+        String recordId,
+        String objectApiName
     ) {
         if (String.isBlank(conversationId)) {
             throw new AuraHandledException('conversationId is required');
@@ -50,7 +52,9 @@ public with sharing class EinsteinChatPublisher {
             Mode__c            = mode,
             User_Message__c    = userMessage,
             History_Json__c    = String.isBlank(historyJson) ? '[]' : historyJson,
-            User_Id__c         = UserInfo.getUserId()
+            User_Id__c         = UserInfo.getUserId(),
+            Record_Id__c       = recordId,
+            Object_Api_Name__c = objectApiName
         );
 
         Database.SaveResult sr = EventBus.publish(evt);

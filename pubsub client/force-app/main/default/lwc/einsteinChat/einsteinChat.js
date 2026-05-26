@@ -1,6 +1,14 @@
-import { LightningElement, track } from 'lwc';
+import { LightningElement, api, track, wire } from 'lwc';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
+import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import publishRequest from '@salesforce/apex/EinsteinChatPublisher.publishRequest';
+
+import USER_ID from '@salesforce/user/Id';
+import NAME_FIELD from '@salesforce/schema/User.Name';
+import FIRST_NAME_FIELD from '@salesforce/schema/User.FirstName';
+import LAST_NAME_FIELD from '@salesforce/schema/User.LastName';
+
+const USER_FIELDS = [NAME_FIELD, FIRST_NAME_FIELD, LAST_NAME_FIELD];
 
 const RESPONSE_CHANNEL = '/event/Einstein_Chat_Response__e';
 const RESPONSE_TIMEOUT_MS = 45000;   // subscriber has 45s to respond before we give up
@@ -12,6 +20,65 @@ const AGENT_META = {
     AccountsAgent:      { label: 'Accounts',     icon: 'utility:account',     color: 'agent-blue'   },
     OpportunitiesAgent: { label: 'Opportunities', icon: 'utility:opportunity', color: 'agent-green'  },
     ContractsAgent:     { label: 'Contracts',     icon: 'utility:contract',    color: 'agent-purple' },
+};
+
+// ── Record-aware prompt suggestions ─────────────────────────────────────────
+// Static prompts keyed by object API name. When the component sits on a record
+// page, these replace the generic welcome chips.
+//
+// HOOK FOR DYNAMIC PROMPTS:
+//   To make these data-driven later, replace the lookup in `recordPrompts`
+//   with a call that interpolates live field values — e.g. wire the record via
+//   getRecord and build "What's the close date for {Name}?" from real data.
+//   The UI already renders whatever array `suggestions` returns, so only the
+//   prompt-building logic needs to change.
+const RECORD_PROMPTS = {
+    Opportunity: [
+        'Summarize this opportunity',
+        'What are the next steps to close?',
+        'Show recent activity on this deal',
+        'What competitors are involved?',
+    ],
+    Account: [
+        'Summarize this account',
+        'Show open opportunities for this account',
+        'List recent cases for this account',
+        'Who are the key contacts?',
+    ],
+    Case: [
+        'Summarize this case',
+        'Suggest a resolution',
+        'Show similar past cases',
+        'Draft a reply to the customer',
+    ],
+    Contact: [
+        'Summarize this contact',
+        'Show recent interactions',
+        'Draft a follow-up email',
+        'What opportunities is this contact on?',
+    ],
+    Lead: [
+        'Summarize this lead',
+        'Is this lead worth pursuing?',
+        'Draft an outreach email',
+        'Suggest next steps',
+    ],
+    Contract: [
+        'Summarize this contract',
+        'When does this contract expire?',
+        'What are the key terms?',
+        'Show related opportunities',
+    ],
+};
+
+// Friendly object label for the welcome copy (fallback to the API name).
+const OBJECT_LABELS = {
+    Opportunity: 'opportunity',
+    Account: 'account',
+    Case: 'case',
+    Contact: 'contact',
+    Lead: 'lead',
+    Contract: 'contract',
 };
 
 let msgIdCounter = 0;
@@ -29,6 +96,21 @@ const newConversationId = () => {
 const formatTime = (date) =>
     date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+// Build up-to-two-letter initials from first/last name, falling back to the
+// full name, then to a generic "ME".
+const deriveInitials = (first, last, fullName) => {
+    if (first || last) {
+        return `${(first || '').charAt(0)}${(last || '').charAt(0)}`.toUpperCase() || 'ME';
+    }
+    if (fullName) {
+        const parts = fullName.trim().split(/\s+/);
+        const a = parts[0]?.charAt(0) || '';
+        const b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+        return `${a}${b}`.toUpperCase() || 'ME';
+    }
+    return 'ME';
+};
+
 export default class EinsteinChat extends LightningElement {
 
     @track uiMessages   = [];
@@ -36,10 +118,41 @@ export default class EinsteinChat extends LightningElement {
     @track isLoading    = false;
     @track errorMessage = null;
     @track isMinimized  = true;
+    @track isMaximized  = false;
     @track unreadCount  = 0;
     @track mode         = MODE_CHAT;
 
+    // ── Record context ──────────────────────────────────────────────────────
+    // When the component is placed on a record page, the Lightning runtime
+    // auto-populates these. On home/app pages they're undefined and the
+    // component falls back to generic prompts.
+    @api recordId;
+    @api objectApiName;
+
     history = [];
+
+    // ── Current user ──────────────────────────────────────────────────────────
+    // Pulls the logged-in user's name so message bubbles show the real user
+    // instead of a hardcoded "John Doe".
+    userId = USER_ID;
+
+    @wire(getRecord, { recordId: '$userId', fields: USER_FIELDS })
+    userRecord;
+
+    get currentUserName() {
+        return this.userRecord?.data
+            ? getFieldValue(this.userRecord.data, NAME_FIELD)
+            : 'You';
+    }
+
+    get currentUserInitials() {
+        if (!this.userRecord?.data) return 'ME';
+        return deriveInitials(
+            getFieldValue(this.userRecord.data, FIRST_NAME_FIELD),
+            getFieldValue(this.userRecord.data, LAST_NAME_FIELD),
+            getFieldValue(this.userRecord.data, NAME_FIELD)
+        );
+    }
 
     // ── Pub/Sub state ─────────────────────────────────────────────────────────
     // Single long-lived subscription to the response channel. Each outgoing
@@ -138,7 +251,14 @@ export default class EinsteinChat extends LightningElement {
         });
 
         // Fire the publish; if it fails synchronously, clean up the pending entry.
-        publishRequest({ conversationId, mode, userMessage, historyJson })
+        publishRequest({
+            conversationId,
+            mode,
+            userMessage,
+            historyJson,
+            recordId:      this.recordId || null,
+            objectApiName: this.objectApiName || null,
+        })
             .catch((err) => {
                 const pending = this._pendingByConvId.get(conversationId);
                 if (pending) {
@@ -153,9 +273,26 @@ export default class EinsteinChat extends LightningElement {
 
     // ── Suggestions (welcome chips) ───────────────────────────────────────────
     get suggestions() {
+        // On a record page with known object-specific prompts, prefer those.
+        const recordPrompts = this.recordPrompts;
+        if (recordPrompts) return recordPrompts;
+
         return this.mode === MODE_AGENTS
             ? ['Show all accounts', "What's in my pipeline?", 'List expiring contracts', 'Show Closed Won opportunities']
             : ['Summarize my open cases', "What's in my pipeline?", 'Draft a follow-up email', 'Show top opportunities'];
+    }
+
+    // Returns object-specific prompts when on a recognized record page, else null.
+    //
+    // HOOK FOR DYNAMIC PROMPTS: replace the static RECORD_PROMPTS lookup here
+    // with logic that interpolates live record field values.
+    get recordPrompts() {
+        if (!this.objectApiName) return null;
+        return RECORD_PROMPTS[this.objectApiName] || null;
+    }
+
+    get isOnRecord() {
+        return !!this.objectApiName;
     }
 
     get agentPills() {
@@ -171,11 +308,25 @@ export default class EinsteinChat extends LightningElement {
     get showWelcome()    { return this.uiMessages.length === 0; }
     get sendDisabled()   { return this.isLoading || !this.inputValue.trim(); }
     get isAgentMode()    { return this.mode === MODE_AGENTS; }
-    get containerClass() { return this.isMinimized ? 'chat-container minimized' : 'chat-container open'; }
+    get containerClass() {
+        if (this.isMinimized) return 'chat-container minimized';
+        return this.isMaximized ? 'chat-container open maximized' : 'chat-container open';
+    }
+    get chatWindowClass() { return this.isMaximized ? 'chat-window chat-window-max' : 'chat-window'; }
+    get maximizeIcon()    { return this.isMaximized ? 'utility:contract_alt' : 'utility:expand_alt'; }
+    get maximizeTitle()   { return this.isMaximized ? 'Restore' : 'Maximize'; }
     get chatModeClass()  { return `mode-btn${this.mode === MODE_CHAT   ? ' mode-active' : ''}`; }
     get agentModeClass() { return `mode-btn${this.mode === MODE_AGENTS ? ' mode-active' : ''}`; }
     get modeHint()       { return this.mode === MODE_AGENTS ? 'Accounts · Opportunities · Contracts' : 'General AI assistant'; }
-    get welcomeSub()     { return this.mode === MODE_AGENTS ? "I'll route your question to the right Salesforce specialist." : 'Your AI-powered assistant. Ask me anything.'; }
+    get welcomeSub() {
+        if (this.isOnRecord) {
+            const label = OBJECT_LABELS[this.objectApiName] || 'record';
+            return `I can help with this ${label}. Pick a prompt below or ask your own.`;
+        }
+        return this.mode === MODE_AGENTS
+            ? "I'll route your question to the right Salesforce specialist."
+            : 'Your AI-powered assistant. Ask me anything.';
+    }
     get inputLabel()     { return this.mode === MODE_AGENTS ? 'Ask a Salesforce agent' : 'Ask Einstein'; }
     get inputPlaceholder() { return this.mode === MODE_AGENTS ? 'e.g. Show expiring contracts…' : 'Ask Einstein anything…'; }
 
@@ -183,12 +334,27 @@ export default class EinsteinChat extends LightningElement {
     setModeChat(e)   { e.stopPropagation(); if (this.mode !== MODE_CHAT)   { this.mode = MODE_CHAT;   this.clearChat(); } }
     setModeAgents(e) { e.stopPropagation(); if (this.mode !== MODE_AGENTS) { this.mode = MODE_AGENTS; this.clearChat(); } }
 
-    // ── Open / Minimize ───────────────────────────────────────────────────────
+    // ── Open / Minimize / Maximize ─────────────────────────────────────────────
     toggleChat() {
         this.isMinimized = !this.isMinimized;
         if (!this.isMinimized) { this.unreadCount = 0; this._scrollToBottom(); }
+        // Collapsing back to the FAB always exits maximized state.
+        if (this.isMinimized) this.isMaximized = false;
     }
-    handleMinimize(e) { e.stopPropagation(); this.isMinimized = true; }
+    handleMinimize(e) { e.stopPropagation(); this.isMinimized = true; this.isMaximized = false; }
+
+    // Maximize button lives inside the header (which has its own onclick to
+    // minimize), so stop propagation to avoid toggling the chat closed.
+    toggleMaximize(e) {
+        e.stopPropagation();
+        this.isMaximized = !this.isMaximized;
+        this._scrollToBottom();
+    }
+
+    // Clicking the dimmed backdrop restores the windowed (non-maximized) size.
+    handleBackdropClick() {
+        this.isMaximized = false;
+    }
 
     // ── Input ─────────────────────────────────────────────────────────────────
     handleInput(e)   { this.inputValue = e.target.value; }
@@ -305,8 +471,8 @@ export default class EinsteinChat extends LightningElement {
             text,
             typing,
             agentName:       meta ? meta.label : null,
-            initials:        isUser ? 'JD' : (meta ? meta.label.slice(0, 2).toUpperCase() : 'AI'),
-            name:            isUser ? 'John Doe' : (meta ? meta.label : 'Einstein'),
+            initials:        isUser ? this.currentUserInitials : (meta ? meta.label.slice(0, 2).toUpperCase() : 'AI'),
+            name:            isUser ? this.currentUserName : (meta ? meta.label : 'Einstein'),
             time:            typing ? null : formatTime(new Date()),
             wrapClass:       `msg-wrap ${isUser ? 'msg-user' : 'msg-assistant'}`,
             avatarClass:     `msg-avatar ${isUser ? 'avatar-user' : (meta ? `avatar-${meta.color}` : 'avatar-ai')}`,

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Object_Api_Name__c</fullName>
+    <description>API name of the record's SObject (e.g. "Opportunity"), when on a record page. Lets the subscriber tailor responses to the record context.</description>
+    <externalId>false</externalId>
+    <label>Object Api Name</label>
+    <length>64</length>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

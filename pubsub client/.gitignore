@@ -1,0 +1,30 @@
+# ── Node / external subscriber ──────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment / secrets — never commit real credentials
+.env
+.env.local
+*.env
+
+# The official Salesforce proto file is downloaded at setup (see PROTO_FILE.md)
+external-subscriber/pubsub_api.proto
+
+# ── Salesforce / sfdx ───────────────────────────────────────────────────────
+.sfdx/
+.sf/
+.localdevserver/
+deploy-options.json
+**/__tests__/**/__snapshots__/
+
+# ── Editor / OS ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────────────
+*.log

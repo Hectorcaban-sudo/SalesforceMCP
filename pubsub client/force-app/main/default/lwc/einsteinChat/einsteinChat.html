@@ -13,7 +13,10 @@
 
         <!-- Chat window (open) -->
         <template lwc:else>
-            <div class="chat-window">
+            <template lwc:if={isMaximized}>
+                <div class="chat-backdrop" onclick={handleBackdropClick}></div>
+            </template>
+            <div class={chatWindowClass}>
 
                 <!-- Header -->
                 <div class="chat-header" onclick={toggleChat} title="Minimize">
@@ -28,6 +31,9 @@
                         <span class="status-badge">
                             <span class="status-dot"></span>Online
                         </span>
+                        <button class="icon-btn" onclick={toggleMaximize} title={maximizeTitle}>
+                            <lightning-icon icon-name={maximizeIcon} size="x-small" alternative-text={maximizeTitle}></lightning-icon>
+                        </button>
                         <button class="icon-btn" onclick={handleMinimize} title="Minimize">
                             <lightning-icon icon-name="utility:minimize_window" size="x-small" alternative-text="Minimize"></lightning-icon>
                         </button>
@@ -99,7 +105,7 @@
                                             </div>
                                         </template>
                                         <template lwc:else>
-                                            {msg.text}
+                                            <c-formatted-message value={msg.text}></c-formatted-message>
                                         </template>
                                     </div>
                                     <template lwc:if={msg.time}>
