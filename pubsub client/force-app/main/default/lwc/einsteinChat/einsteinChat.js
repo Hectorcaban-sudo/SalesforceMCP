@@ -370,6 +370,19 @@ export default class EinsteinChat extends LightningElement {
         this.uiMessages   = [];
         this.errorMessage = null;
         this.unreadCount  = 0;
+        this.inputValue   = '';
+        this._clearTextarea();
+    }
+
+    // A bound <textarea>'s rendered content is its child text node, which the
+    // `value` attribute binding does not reliably reset to empty. Clear the DOM
+    // element directly so the box visibly empties after sending.
+    _clearTextarea() {
+        const ta = this.refs?.textarea;
+        if (ta) {
+            ta.value = '';
+            ta.style.height = 'auto';   // reset any auto-grow height
+        }
     }
 
     // ── Send ──────────────────────────────────────────────────────────────────
@@ -378,6 +391,7 @@ export default class EinsteinChat extends LightningElement {
         if (!text || this.isLoading) return;
 
         this.inputValue   = '';
+        this._clearTextarea();
         this.errorMessage = null;
         this.isLoading    = true;
 

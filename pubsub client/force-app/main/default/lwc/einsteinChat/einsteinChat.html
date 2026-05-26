@@ -157,6 +157,7 @@
                             oninput={handleInput}
                             onkeydown={handleKeyDown}
                             disabled={isLoading}
+                            lwc:ref="textarea"
                             rows="1">
                         </textarea>
                         <button class="send-btn" onclick={sendMessage} disabled={sendDisabled} title="Send">

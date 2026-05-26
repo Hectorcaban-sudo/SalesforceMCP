@@ -27,7 +27,7 @@ const ALLOWED_TAGS = new Set([
 ]);
 
 // Per-tag allowed attributes. Anything not listed is stripped.
-const ALLOWED_ATTRS = { 
+const ALLOWED_ATTRS = {
     A: ['href', 'title'],
 };
 
@@ -48,6 +48,25 @@ const escapeHtml = (str) =>
 const looksLikeHtml = (str) => /<[a-z][\s\S]*>/i.test(str);
 
 const isSafeUrl = (url) => SAFE_URL_RE.test(url.trim());
+
+/**
+ * Normalizes literal escape sequences that show up when text has been
+ * JSON-encoded an extra time (so the response carries the two characters
+ * backslash + "n" instead of a real newline). Converts \n, \r\n, \r, and \t
+ * into real control characters. A doubled backslash (\\) is preserved as a
+ * single literal backslash so genuine "\n" text isn't mangled.
+ */
+function normalizeEscapes(str) {
+    return str.replace(/\\(\\|[nrt])/g, (m, ch) => {
+        switch (ch) {
+            case 'n': return '\n';
+            case 'r': return '\r';
+            case 't': return '\t';
+            case '\\': return '\\';   // collapse escaped backslash
+            default: return m;
+        }
+    });
+}
 
 /**
  * Replaces bare URLs in a plain (already-escaped) text string with anchor tags.
@@ -135,7 +154,9 @@ function sanitizeNode(node, doc) {
  */
 export function formatMessage(raw) {
     if (raw == null) return '';
-    const text = String(raw);
+    // Normalize literal "\n" / "\t" escape sequences (from double-encoded JSON)
+    // into real control characters before any other processing.
+    const text = normalizeEscapes(String(raw));
 
     if (!looksLikeHtml(text)) {
         return formatPlainText(text);
