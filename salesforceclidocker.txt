@@ -1,0 +1,49 @@
+# escape=`
+
+# =====================================================================
+#  Stage 1: download & extract the Salesforce CLI on Server Core
+#  (Nano Server is too minimal to run Invoke-WebRequest / extract .tar.xz
+#   reliably, so we do that work in a fuller image and copy the result.)
+# =====================================================================
+FROM mcr.microsoft.com/windows/servercore:ltsc2022 AS builder
+
+SHELL ["powershell", "-NoProfile", "-Command", `
+       "$ErrorActionPreference = 'Stop';", `
+       "$ProgressPreference   = 'SilentlyContinue';"]
+
+# Standalone tarball ships with its own bundled Node.js — no Node needed in final image.
+ARG SF_CLI_URL=https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-win32-x64.tar.xz
+
+RUN New-Item -ItemType Directory -Path C:\stage | Out-Null; `
+    Invoke-WebRequest -Uri $env:SF_CLI_URL -OutFile C:\stage\sf.tar.xz; `
+    tar -xJf C:\stage\sf.tar.xz -C C:\stage; `
+    Remove-Item C:\stage\sf.tar.xz
+
+# After extraction, the CLI tree lives at C:\stage\sf\
+#   C:\stage\sf\bin\sf.cmd
+#   C:\stage\sf\bin\sfdx.cmd
+#   C:\stage\sf\client\bin\node.exe   (bundled runtime)
+
+
+# =====================================================================
+#  Stage 2: final image — Windows Nano Server LTSC 2022
+# =====================================================================
+FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+
+# Need admin to write to Program Files / set machine-wide PATH
+USER ContainerAdministrator
+
+COPY --from=builder C:\stage\sf C:\sf
+
+# Put sf.cmd and sfdx.cmd on the machine PATH
+RUN setx /M PATH "%PATH%;C:\sf\bin"
+
+# (Optional) Telemetry off — uncomment if you want it disabled by default
+# ENV SF_DISABLE_TELEMETRY=true
+
+# Drop back to the unprivileged default user
+USER ContainerUser
+
+WORKDIR C:\workspace
+
+CMD ["cmd.exe"]
