@@ -1,38 +1,29 @@
-# ==========================================
-# Stage 1: Build & Extraction (Server Core)
-# ==========================================
-FROM mcr.microsoft.com/windows/servercore:ltsc2022 AS builder
+# Use the standard Windows Server Core 2022 base image
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# Use PowerShell for the build stage
+# Set PowerShell as the default shell for running commands
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Set the URL for the Windows x64 Salesforce CLI tarball
+# The download URL for the standalone Salesforce CLI
 ENV SF_CLI_URL="https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-win32-x64.tar.gz"
 
-RUN New-Item -ItemType Directory -Path C:\downloads; \
-    New-Item -ItemType Directory -Path C:\sf_cli; \
-    Write-Host 'Downloading Salesforce CLI...'; \
-    Invoke-WebRequest -Uri $ENV:SF_CLI_URL -OutFile C:\downloads\sf-cli.tar.gz; \
-    Write-Host 'Extracting tarball...'; \
-    tar -xzf C:\downloads\sf-cli.tar.gz -C C:\sf_cli --strip-components 1
+# Download, extract, clean up, and set the system PATH in a single RUN command
+# Doing this in one step keeps the Docker image size as small as possible
+RUN Write-Host 'Downloading Salesforce CLI...' ; \
+    Invoke-WebRequest -Uri $ENV:SF_CLI_URL -OutFile C:\sf-cli.tar.gz ; \
+    \
+    Write-Host 'Extracting to C:\sf_cli...' ; \
+    New-Item -ItemType Directory -Path C:\sf_cli | Out-Null ; \
+    tar -xzf C:\sf-cli.tar.gz -C C:\sf_cli --strip-components 1 ; \
+    \
+    Write-Host 'Cleaning up downloaded archive...' ; \
+    Remove-Item C:\sf-cli.tar.gz ; \
+    \
+    Write-Host 'Adding Salesforce CLI to Machine PATH...' ; \
+    $newPath = 'C:\sf_cli\bin;' + [Environment]::GetEnvironmentVariable('PATH', [EnvironmentVariableTarget]::Machine) ; \
+    [Environment]::SetEnvironmentVariable('PATH', $newPath, [EnvironmentVariableTarget]::Machine)
 
-# ==========================================
-# Stage 2: Final Runtime Image (Nano Server)
-# ==========================================
-FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
-
-# Switch to ContainerAdministrator to modify the system PATH persistently
-USER ContainerAdministrator
-
-# Copy the extracted Salesforce CLI directory from the builder stage
-COPY --from=builder C:\sf_cli C:\sf_cli
-
-# Add the Salesforce CLI bin directory to the system PATH
-RUN setx /M PATH "%PATH%;C:\sf_cli\bin"
-
-# Switch back to the secure, default user
-USER ContainerUser
-
+# Set the working directory
 WORKDIR C:\app
 
 # Set the default command to verify the installation
