@@ -23,52 +23,59 @@ const AGENT_META = {
 };
 
 // ── Record-aware prompt suggestions ─────────────────────────────────────────
-// Static prompts keyed by object API name. When the component sits on a record
-// page, these replace the generic welcome chips.
-//
-// HOOK FOR DYNAMIC PROMPTS:
-//   To make these data-driven later, replace the lookup in `recordPrompts`
-//   with a call that interpolates live field values — e.g. wire the record via
-//   getRecord and build "What's the close date for {Name}?" from real data.
-//   The UI already renders whatever array `suggestions` returns, so only the
-//   prompt-building logic needs to change.
+// Per-object prompt templates. The {name} token is replaced at render time
+// with the live record's display field value (see DISPLAY_FIELD below).
+// The record ID is never shown — only the friendly name.
 const RECORD_PROMPTS = {
     Opportunity: [
-        'Summarize this opportunity',
-        'What are the next steps to close?',
-        'Show recent activity on this deal',
-        'What competitors are involved?',
+        'Summarize {name}',
+        'What are the next steps to close {name}?',
+        'Show recent activity on {name}',
+        'What competitors are involved on {name}?',
     ],
     Account: [
-        'Summarize this account',
-        'Show open opportunities for this account',
-        'List recent cases for this account',
-        'Who are the key contacts?',
+        'Summarize {name}',
+        'Show open opportunities for {name}',
+        'List recent cases for {name}',
+        'Who are the key contacts at {name}?',
     ],
     Case: [
-        'Summarize this case',
-        'Suggest a resolution',
+        'Summarize {name}',
+        'Suggest a resolution for {name}',
         'Show similar past cases',
         'Draft a reply to the customer',
     ],
     Contact: [
-        'Summarize this contact',
-        'Show recent interactions',
-        'Draft a follow-up email',
-        'What opportunities is this contact on?',
+        'Summarize {name}',
+        'Show recent interactions with {name}',
+        'Draft a follow-up email to {name}',
+        'What opportunities is {name} on?',
     ],
     Lead: [
-        'Summarize this lead',
-        'Is this lead worth pursuing?',
-        'Draft an outreach email',
-        'Suggest next steps',
+        'Summarize {name}',
+        'Is {name} worth pursuing?',
+        'Draft an outreach email to {name}',
+        'Suggest next steps for {name}',
     ],
     Contract: [
-        'Summarize this contract',
-        'When does this contract expire?',
-        'What are the key terms?',
+        'Summarize {name}',
+        'When does {name} expire?',
+        'What are the key terms of {name}?',
         'Show related opportunities',
     ],
+};
+
+// Configurable display field per object — what to show as the record's
+// "name" in prompt chips. Defaults to "Name" for any object not listed.
+// Override here per org/customization need.
+const DISPLAY_FIELD = {
+    Opportunity: 'Name',
+    Account:     'Name',
+    Case:        'CaseNumber',     // numeric case identifier reads better than Subject
+    Contact:     'Name',
+    Lead:        'Name',
+    Contract:    'ContractNumber',
+    User:        'Name',
 };
 
 // Friendly object label for the welcome copy (fallback to the API name).
@@ -152,6 +159,32 @@ export default class EinsteinChat extends LightningElement {
             getFieldValue(this.userRecord.data, LAST_NAME_FIELD),
             getFieldValue(this.userRecord.data, NAME_FIELD)
         );
+    }
+
+    // ── Current record ────────────────────────────────────────────────────────
+    // When on a record page, wire the record to fetch its display field so we
+    // can show the record's *name* (not its ID) in the prompt chips. The record
+    // ID is still sent on the published event — it's just never rendered to
+    // the user.
+    //
+    // The fields list is dynamic (`'Opportunity.Name'`-style strings) so we
+    // don't need a compile-time @salesforce/schema import per object.
+    get _recordFields() {
+        if (!this.objectApiName) return [];
+        const field = DISPLAY_FIELD[this.objectApiName] || 'Name';
+        return [`${this.objectApiName}.${field}`];
+    }
+
+    @wire(getRecord, { recordId: '$recordId', fields: '$_recordFields' })
+    currentRecord;
+
+    // Returns the display name of the current record, or null when unavailable
+    // (wire still loading, no record context, or field not readable).
+    get recordDisplayName() {
+        if (!this.currentRecord?.data || !this.objectApiName) return null;
+        const field = DISPLAY_FIELD[this.objectApiName] || 'Name';
+        const value = this.currentRecord.data.fields?.[field]?.value;
+        return value != null && value !== '' ? String(value) : null;
     }
 
     // ── Pub/Sub state ─────────────────────────────────────────────────────────
@@ -282,13 +315,20 @@ export default class EinsteinChat extends LightningElement {
             : ['Summarize my open cases', "What's in my pipeline?", 'Draft a follow-up email', 'Show top opportunities'];
     }
 
-    // Returns object-specific prompts when on a recognized record page, else null.
+    // Returns object-specific prompts with the record's display name
+    // interpolated into each template's {name} placeholder.
     //
-    // HOOK FOR DYNAMIC PROMPTS: replace the static RECORD_PROMPTS lookup here
-    // with logic that interpolates live record field values.
+    // While the record wire is loading, falls back to "this <object>" so the
+    // chips work immediately instead of flashing empty values.
     get recordPrompts() {
         if (!this.objectApiName) return null;
-        return RECORD_PROMPTS[this.objectApiName] || null;
+        const templates = RECORD_PROMPTS[this.objectApiName];
+        if (!templates) return null;
+
+        const name = this.recordDisplayName
+            || `this ${OBJECT_LABELS[this.objectApiName] || 'record'}`;
+
+        return templates.map((tpl) => tpl.replace(/\{name\}/g, name));
     }
 
     get isOnRecord() {
@@ -321,7 +361,10 @@ export default class EinsteinChat extends LightningElement {
     get welcomeSub() {
         if (this.isOnRecord) {
             const label = OBJECT_LABELS[this.objectApiName] || 'record';
-            return `I can help with this ${label}. Pick a prompt below or ask your own.`;
+            const name = this.recordDisplayName;
+            return name
+                ? `I can help with ${name}. Pick a prompt below or ask your own.`
+                : `I can help with this ${label}. Pick a prompt below or ask your own.`;
         }
         return this.mode === MODE_AGENTS
             ? "I'll route your question to the right Salesforce specialist."
