@@ -2,6 +2,13 @@ import { LightningElement, api, track, wire } from 'lwc';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import publishRequest from '@salesforce/apex/EinsteinChatPublisher.publishRequest';
+import {
+    saveChat,
+    listChats,
+    loadChat,
+    deleteChat,
+    isAvailable as historyAvailable,
+} from 'c/chatHistory';
 
 import USER_ID from '@salesforce/user/Id';
 import NAME_FIELD from '@salesforce/schema/User.Name';
@@ -126,8 +133,18 @@ export default class EinsteinChat extends LightningElement {
     @track errorMessage = null;
     @track isMinimized  = true;
     @track isMaximized  = false;
+    @track isDocked     = false;
     @track unreadCount  = 0;
     @track mode         = MODE_CHAT;
+
+    // History
+    @track currentChatId     = null;
+    @track showHistoryPanel  = false;
+    @track savedChats        = [];
+
+    // The conversationId of the in-flight publish (used by the Stop button to
+    // abort cleanly).
+    _inFlightConvId = null;
 
     // ── Record context ──────────────────────────────────────────────────────
     // When the component is placed on a record page, the Lightning runtime
@@ -205,6 +222,7 @@ export default class EinsteinChat extends LightningElement {
             });
             this._empApiErrorBound = true;
         }
+        this._refreshSavedChats();
         await this._ensureSubscribed();
     }
 
@@ -350,14 +368,22 @@ export default class EinsteinChat extends LightningElement {
     get isAgentMode()    { return this.mode === MODE_AGENTS; }
     get containerClass() {
         if (this.isMinimized) return 'chat-container minimized';
+        if (this.isDocked)    return 'chat-container open docked';
         return this.isMaximized ? 'chat-container open maximized' : 'chat-container open';
     }
-    get chatWindowClass() { return this.isMaximized ? 'chat-window chat-window-max' : 'chat-window'; }
+    get chatWindowClass() {
+        if (this.isDocked)    return 'chat-window chat-window-docked';
+        if (this.isMaximized) return 'chat-window chat-window-max';
+        return 'chat-window';
+    }
     get maximizeIcon()    { return this.isMaximized ? 'utility:contract_alt' : 'utility:expand_alt'; }
     get maximizeTitle()   { return this.isMaximized ? 'Restore' : 'Maximize'; }
+    get dockIcon()        { return this.isDocked ? 'utility:close' : 'utility:right_align_text'; }
+    get dockTitle()       { return this.isDocked ? 'Undock' : 'Dock to right'; }
     get chatModeClass()  { return `mode-btn${this.mode === MODE_CHAT   ? ' mode-active' : ''}`; }
     get agentModeClass() { return `mode-btn${this.mode === MODE_AGENTS ? ' mode-active' : ''}`; }
     get modeHint()       { return this.mode === MODE_AGENTS ? 'Accounts · Opportunities · Contracts' : 'General AI assistant'; }
+    get hasSavedChats()  { return this.savedChats.length > 0; }
     get welcomeSub() {
         if (this.isOnRecord) {
             const label = OBJECT_LABELS[this.objectApiName] || 'record';
@@ -377,24 +403,49 @@ export default class EinsteinChat extends LightningElement {
     setModeChat(e)   { e.stopPropagation(); if (this.mode !== MODE_CHAT)   { this.mode = MODE_CHAT;   this.clearChat(); } }
     setModeAgents(e) { e.stopPropagation(); if (this.mode !== MODE_AGENTS) { this.mode = MODE_AGENTS; this.clearChat(); } }
 
-    // ── Open / Minimize / Maximize ─────────────────────────────────────────────
+    // ── Open / Minimize / Maximize / Dock ─────────────────────────────────────
     toggleChat() {
         this.isMinimized = !this.isMinimized;
         if (!this.isMinimized) { this.unreadCount = 0; this._scrollToBottom(); }
-        // Collapsing back to the FAB always exits maximized state.
-        if (this.isMinimized) this.isMaximized = false;
+        // Collapsing back to the FAB always exits maximized and docked state.
+        if (this.isMinimized) {
+            this.isMaximized = false;
+            this.isDocked    = false;
+        }
     }
-    handleMinimize(e) { e.stopPropagation(); this.isMinimized = true; this.isMaximized = false; }
+    handleMinimize(e) {
+        e.stopPropagation();
+        this.isMinimized = true;
+        this.isMaximized = false;
+        this.isDocked    = false;
+    }
 
-    // Maximize button lives inside the header (which has its own onclick to
-    // minimize), so stop propagation to avoid toggling the chat closed.
+    // Maximize, dock, and the default windowed size are mutually exclusive
+    // states. The header has its own onclick to minimize, so stop propagation.
     toggleMaximize(e) {
         e.stopPropagation();
-        this.isMaximized = !this.isMaximized;
+        if (this.isMaximized) {
+            this.isMaximized = false;
+        } else {
+            this.isMaximized = true;
+            this.isDocked    = false;
+        }
+        this._scrollToBottom();
+    }
+
+    toggleDock(e) {
+        e.stopPropagation();
+        if (this.isDocked) {
+            this.isDocked = false;
+        } else {
+            this.isDocked    = true;
+            this.isMaximized = false;
+        }
         this._scrollToBottom();
     }
 
     // Clicking the dimmed backdrop restores the windowed (non-maximized) size.
+    // Docked mode has no backdrop so this is only triggered from maximized.
     handleBackdropClick() {
         this.isMaximized = false;
     }
@@ -408,13 +459,30 @@ export default class EinsteinChat extends LightningElement {
         this.sendMessage();
     }
 
+    /**
+     * "Start a new chat" — saves the current chat (if any) and resets state.
+     * Also called when the mode toggle changes, since chat ↔ agents shouldn't
+     * share message threads.
+     */
     clearChat() {
-        this.history      = [];
-        this.uiMessages   = [];
-        this.errorMessage = null;
-        this.unreadCount  = 0;
-        this.inputValue   = '';
+        // Cancel any in-flight request before throwing away the chat.
+        if (this.isLoading) this.stopRequest();
+        this._persistCurrent();        // save before discarding
+
+        this.currentChatId = null;
+        this.history       = [];
+        this.uiMessages    = [];
+        this.errorMessage  = null;
+        this.unreadCount   = 0;
+        this.inputValue    = '';
         this._clearTextarea();
+        this._refreshSavedChats();
+    }
+
+    // Explicit "New chat" button — semantically identical to clearChat but
+    // named to match the UI affordance.
+    newChat() {
+        this.clearChat();
     }
 
     // A bound <textarea>'s rendered content is its child text node, which the
@@ -426,6 +494,182 @@ export default class EinsteinChat extends LightningElement {
             ta.value = '';
             ta.style.height = 'auto';   // reset any auto-grow height
         }
+    }
+
+    // ── History (localStorage) ────────────────────────────────────────────────
+    _persistCurrent() {
+        if (!historyAvailable()) return;
+        // Don't save empty chats, or chats that are still just a typing bubble.
+        const realMessages = this.uiMessages.filter((m) => !m.typing);
+        if (realMessages.length === 0) return;
+
+        const saved = saveChat({
+            id:         this.currentChatId,
+            mode:       this.mode,
+            uiMessages: realMessages,
+            history:    this.history,
+        });
+        this.currentChatId = saved.id;
+    }
+
+    _refreshSavedChats() {
+        if (!historyAvailable()) {
+            this.savedChats = [];
+            return;
+        }
+        // Decorate with display-only fields for the template.
+        this.savedChats = listChats().map((c) => ({
+            id:      c.id,
+            title:   c.title,
+            mode:    c.mode,
+            updated: this._formatRelativeTime(c.updatedAt),
+            isActive: c.id === this.currentChatId,
+            itemClass: c.id === this.currentChatId
+                ? 'history-item history-item-active'
+                : 'history-item',
+        }));
+    }
+
+    toggleHistoryPanel(e) {
+        if (e) e.stopPropagation();
+        this.showHistoryPanel = !this.showHistoryPanel;
+        if (this.showHistoryPanel) this._refreshSavedChats();
+    }
+
+    closeHistoryPanel() {
+        this.showHistoryPanel = false;
+    }
+
+    handleLoadChat(e) {
+        const id = e.currentTarget.dataset.id;
+        if (!id) return;
+        // Save the current chat before switching.
+        this._persistCurrent();
+
+        const chat = loadChat(id);
+        if (!chat) return;
+
+        // Cancel any in-flight request from the chat we're leaving.
+        if (this.isLoading) this.stopRequest();
+
+        this.currentChatId = chat.id;
+        this.mode          = chat.mode || MODE_CHAT;
+        this.history       = chat.history || [];
+        this.uiMessages    = (chat.uiMessages || []).map((m) => ({ ...m, typing: false }));
+        this.errorMessage  = null;
+        this.unreadCount   = 0;
+        this.showHistoryPanel = false;
+        this._refreshSavedChats();
+        this._scrollToBottom();
+    }
+
+    handleDeleteChat(e) {
+        e.stopPropagation();   // don't also trigger handleLoadChat
+        const id = e.currentTarget.dataset.id;
+        if (!id) return;
+        deleteChat(id);
+        // If the user deleted the chat they were viewing, also clear the view.
+        if (id === this.currentChatId) {
+            this.currentChatId = null;
+            this.history       = [];
+            this.uiMessages    = [];
+        }
+        this._refreshSavedChats();
+    }
+
+    // ── Stop in-flight request ────────────────────────────────────────────────
+    stopRequest() {
+        if (!this.isLoading) return;
+        const convId = this._inFlightConvId;
+        if (convId) {
+            const pending = this._pendingByConvId.get(convId);
+            if (pending) {
+                clearTimeout(pending.timeoutId);
+                this._pendingByConvId.delete(convId);
+            }
+        }
+        this._inFlightConvId = null;
+        this.isLoading       = false;
+        // Drop the typing bubble.
+        this.uiMessages = this.uiMessages.filter((m) => !m.typing);
+        // Note: we don't try to recall the published platform event — once
+        // it's on the bus, it's on the bus. Late-arriving response events
+        // for this convId will be ignored because we removed the pending entry.
+    }
+
+    // ── Copy a message to clipboard ───────────────────────────────────────────
+    async handleCopyMessage(e) {
+        e.stopPropagation();
+        const id = e.currentTarget.dataset.id;
+        const msg = this.uiMessages.find((m) => m.id === id);
+        if (!msg) return;
+
+        // Strip HTML to plain text. The bot's `text` may contain tags or bare
+        // URLs; users want the readable version on their clipboard.
+        const plain = this._htmlToPlainText(msg.text || '');
+
+        try {
+            await navigator.clipboard.writeText(plain);
+        } catch (err) {
+            // Fallback via a hidden textarea + execCommand for older runtimes.
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = plain;
+                ta.style.position = 'fixed';
+                ta.style.opacity  = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            } catch {
+                // eslint-disable-next-line no-console
+                console.error('[einsteinChat] clipboard copy failed', err);
+                return;
+            }
+        }
+
+        // Lightweight visual feedback: flip the copied flag on the message for
+        // a couple of seconds.
+        this.uiMessages = this.uiMessages.map((m) =>
+            m.id === id ? { ...m, copied: true } : m
+        );
+        setTimeout(() => {
+            this.uiMessages = this.uiMessages.map((m) =>
+                m.id === id ? { ...m, copied: false } : m
+            );
+        }, 1800);
+    }
+
+    _htmlToPlainText(input) {
+        if (input == null) return '';
+        const s = String(input);
+        // Quick path: no tags → strip backslash escapes and return.
+        if (!/<[a-z][\s\S]*>/i.test(s)) {
+            return s.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\\\/g, '\\');
+        }
+        try {
+            const doc = new DOMParser().parseFromString(s, 'text/html');
+            // Replace <br> with newlines, block-end tags with newlines.
+            doc.body.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
+            doc.body.querySelectorAll('p, div, li, tr').forEach((el) => {
+                el.appendChild(doc.createTextNode('\n'));
+            });
+            return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+        } catch {
+            return s.replace(/<[^>]+>/g, '');
+        }
+    }
+
+    _formatRelativeTime(ts) {
+        const delta = Date.now() - ts;
+        const m = Math.floor(delta / 60000);
+        if (m < 1)    return 'just now';
+        if (m < 60)   return `${m}m ago`;
+        const h = Math.floor(m / 60);
+        if (h < 24)   return `${h}h ago`;
+        const d = Math.floor(h / 24);
+        if (d < 7)    return `${d}d ago`;
+        return new Date(ts).toLocaleDateString();
     }
 
     // ── Send ──────────────────────────────────────────────────────────────────
@@ -452,6 +696,7 @@ export default class EinsteinChat extends LightningElement {
         // appends the current user message before calling the LLM.
         const priorHistoryJson = JSON.stringify(this.history);
         const conversationId   = newConversationId();
+        this._inFlightConvId   = conversationId;
 
         try {
             await this._ensureSubscribed();   // defensive: re-subscribe if dropped
@@ -468,11 +713,16 @@ export default class EinsteinChat extends LightningElement {
             } else {
                 this._applyChatResponse(result);
             }
+
+            // Auto-save after a successful turn.
+            this._persistCurrent();
+            this._refreshSavedChats();
         } catch (err) {
             this.uiMessages   = this.uiMessages.filter(m => !m.typing);
             this.errorMessage = err.message || 'Could not reach Einstein. Please try again.';
         } finally {
-            this.isLoading = false;
+            this._inFlightConvId = null;
+            this.isLoading       = false;
             this._scrollToBottom();
         }
     }
@@ -537,6 +787,8 @@ export default class EinsteinChat extends LightningElement {
             agentBadgeClass: `agent-badge ${meta ? meta.color : ''}`,
             suggestions,
             showSuggestions: !typing && !isUser && suggestions.length > 0,
+            showCopy:        !typing,    // copy icon hidden on the typing bubble only
+            copied:          false,      // flipped briefly after a successful copy
         };
     }
 

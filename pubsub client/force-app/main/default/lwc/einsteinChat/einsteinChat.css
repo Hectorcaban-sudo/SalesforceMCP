@@ -99,6 +99,7 @@
 
 /* ── Chat window ───────────────────────────────────────────────────────── */
 .chat-window {
+    position: relative;
     display: flex;
     flex-direction: column;
     width: 380px;
@@ -644,4 +645,197 @@
 
 .chip-followup:hover {
     background: #f3e5f5;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Dock-right mode
+   The window pins to the right edge, full height under the SF nav header,
+   while the record page sits underneath (this is an overlay — Salesforce
+   doesn't reflow the page since LWC can't reach outside its shadow root).
+   ───────────────────────────────────────────────────────────────────────── */
+.chat-container.docked {
+    inset: 0 0 0 auto;
+    bottom: auto;
+    right: 0;
+    z-index: 9500;
+    pointer-events: none;
+}
+
+.chat-window-docked {
+    pointer-events: auto;
+    position: fixed;
+    top: 52px;                                 /* below the SF global header */
+    right: 0;
+    bottom: 0;
+    width: min(420px, 35vw);
+    height: calc(100vh - 52px);
+    max-height: none;
+    border-radius: 0;
+    border-right: none;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.18);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   History panel
+   ───────────────────────────────────────────────────────────────────────── */
+.history-panel {
+    position: absolute;
+    inset: 0;
+    background: #ffffff;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.18s ease-out both;
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(8px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+.history-header {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #dddbda;
+    background: #f3f3f3;
+}
+
+.history-title {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #181818;
+}
+
+.history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+}
+
+.history-item:hover {
+    background: #f3f3f3;
+}
+
+.history-item-active {
+    background: #e8f0fe;
+    border-left-color: #0176d3;
+}
+
+.history-item-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-item-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #181818;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-item-sub {
+    font-size: 0.65rem;
+    color: #706e6b;
+    margin-top: 1px;
+}
+
+.history-delete {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: #706e6b;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.1s, background 0.1s;
+}
+
+.history-item:hover .history-delete {
+    opacity: 1;
+}
+
+.history-delete:hover {
+    background: #fef0f0;
+    color: #c23934;
+}
+
+.history-empty {
+    padding: 1.25rem;
+    text-align: center;
+    color: #706e6b;
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Per-message footer: copy button + timestamp
+   ───────────────────────────────────────────────────────────────────────── */
+.msg-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 2px;
+}
+
+.copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    color: #706e6b;
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+
+.msg-wrap:hover .copy-btn { opacity: 1; }
+
+.copy-btn:hover {
+    background: #f3f3f3;
+    color: #181818;
+}
+
+.copy-btn lightning-icon {
+    --sds-c-icon-color-foreground-default: currentColor;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Stop button (replaces send while in flight)
+   ───────────────────────────────────────────────────────────────────────── */
+.stop-btn {
+    background: #c23934 !important;
+    animation: pulseStop 1.4s infinite ease-in-out;
+}
+
+.stop-btn:hover {
+    background: #a02622 !important;
+}
+
+@keyframes pulseStop {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(194, 57, 52, 0.55); }
+    50%      { box-shadow: 0 0 0 6px rgba(194, 57, 52, 0); }
 }

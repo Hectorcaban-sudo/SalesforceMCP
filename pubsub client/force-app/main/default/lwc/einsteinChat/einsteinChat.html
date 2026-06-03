@@ -28,9 +28,15 @@
                         <span class="header-title">Einstein AI Assistant</span>
                     </div>
                     <div class="header-actions">
-                        <span class="status-badge">
-                            <span class="status-dot"></span>Online
-                        </span>
+                        <button class="icon-btn" onclick={toggleHistoryPanel} title="Past chats">
+                            <lightning-icon icon-name="utility:rows" size="x-small" alternative-text="Past chats"></lightning-icon>
+                        </button>
+                        <button class="icon-btn" onclick={newChat} title="New chat">
+                            <lightning-icon icon-name="utility:new" size="x-small" alternative-text="New chat"></lightning-icon>
+                        </button>
+                        <button class="icon-btn" onclick={toggleDock} title={dockTitle}>
+                            <lightning-icon icon-name={dockIcon} size="x-small" alternative-text={dockTitle}></lightning-icon>
+                        </button>
                         <button class="icon-btn" onclick={toggleMaximize} title={maximizeTitle}>
                             <lightning-icon icon-name={maximizeIcon} size="x-small" alternative-text={maximizeTitle}></lightning-icon>
                         </button>
@@ -61,6 +67,38 @@
                                 <lightning-icon icon-name={pill.icon} size="xx-small" alternative-text={pill.name}></lightning-icon>
                                 {pill.label}
                             </span>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- History panel (slides in over the message area) -->
+                <template lwc:if={showHistoryPanel}>
+                    <div class="history-panel">
+                        <div class="history-header">
+                            <span class="history-title">Past chats</span>
+                            <button class="icon-btn" onclick={closeHistoryPanel} title="Close">
+                                <lightning-icon icon-name="utility:close" size="x-small" alternative-text="Close"></lightning-icon>
+                            </button>
+                        </div>
+                        <template lwc:if={hasSavedChats}>
+                            <div class="history-list">
+                                <template for:each={savedChats} for:item="chat">
+                                    <div key={chat.id} class={chat.itemClass} data-id={chat.id} onclick={handleLoadChat}>
+                                        <div class="history-item-main">
+                                            <div class="history-item-title">{chat.title}</div>
+                                            <div class="history-item-sub">{chat.updated} · {chat.mode}</div>
+                                        </div>
+                                        <button class="history-delete" data-id={chat.id} onclick={handleDeleteChat} title="Delete">
+                                            <lightning-icon icon-name="utility:delete" size="xx-small" alternative-text="Delete"></lightning-icon>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template lwc:else>
+                            <div class="history-empty">
+                                No past chats yet. Send a message to start one.
+                            </div>
                         </template>
                     </div>
                 </template>
@@ -108,8 +146,24 @@
                                             <c-formatted-message value={msg.text}></c-formatted-message>
                                         </template>
                                     </div>
-                                    <template lwc:if={msg.time}>
-                                        <span class="msg-time">{msg.time}</span>
+                                    <template lwc:if={msg.showCopy}>
+                                        <div class="msg-footer">
+                                            <button class="copy-btn"
+                                                    data-id={msg.id}
+                                                    onclick={handleCopyMessage}
+                                                    title="Copy to clipboard">
+                                                <template lwc:if={msg.copied}>
+                                                    <lightning-icon icon-name="utility:check" size="xx-small" alternative-text="Copied"></lightning-icon>
+                                                    Copied
+                                                </template>
+                                                <template lwc:else>
+                                                    <lightning-icon icon-name="utility:copy" size="xx-small" alternative-text="Copy"></lightning-icon>
+                                                </template>
+                                            </button>
+                                            <template lwc:if={msg.time}>
+                                                <span class="msg-time">{msg.time}</span>
+                                            </template>
+                                        </div>
                                     </template>
                                 </div>
                             </div>
@@ -160,9 +214,16 @@
                             lwc:ref="textarea"
                             rows="1">
                         </textarea>
-                        <button class="send-btn" onclick={sendMessage} disabled={sendDisabled} title="Send">
-                            <lightning-icon icon-name="utility:send" size="x-small" alternative-text="Send"></lightning-icon>
-                        </button>
+                        <template lwc:if={isLoading}>
+                            <button class="send-btn stop-btn" onclick={stopRequest} title="Stop">
+                                <lightning-icon icon-name="utility:stop" size="x-small" alternative-text="Stop"></lightning-icon>
+                            </button>
+                        </template>
+                        <template lwc:else>
+                            <button class="send-btn" onclick={sendMessage} disabled={sendDisabled} title="Send">
+                                <lightning-icon icon-name="utility:send" size="x-small" alternative-text="Send"></lightning-icon>
+                            </button>
+                        </template>
                     </div>
                     <div class="input-footer">
                         ★ Powered by Einstein AI · Responses may not always be accurate
