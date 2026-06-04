@@ -2,7 +2,8 @@
 # Salesforce Sandbox Migration Config
 # ============================================================
 # Run:  python sf_migrate.py --config sf_migrate_config.yaml
-# Dry:  python sf_migrate.py --config sf_migrate_config.yaml --dry-run
+# Dry:  python sf_migrate.py --dry-run
+# History only on:  python sf_migrate.py --field-history --activity-history
 # ============================================================
 
 source:
@@ -21,8 +22,38 @@ migration:
   batch_size: 200               # records per API call batch
   dry_run: false                # true = read-only planning mode; no writes
   include_children: true        # set false to skip all child objects
-  record_limit:                 # global max records per object — leave blank for unlimited
-                                # overridden per-object below; also overridden by --limit CLI flag
+  record_limit:                 # global max records per object (blank = unlimited)
+                                # overridden per-object; also overridden by --limit CLI flag
+
+  # ----------------------------------------------------------
+  # Field History
+  # ----------------------------------------------------------
+  # Salesforce does NOT allow inserting into *History objects via the API.
+  # This tool exports field history to JSON sidecar files for archival /
+  # external reporting. Set migrate_field_history: true on each object below.
+  #
+  # Exported files are written to export_dir as:
+  #   <export_dir>/AccountHistory_20240601_120000.json
+  # ----------------------------------------------------------
+  field_history:
+    enabled: false              # master switch; also --field-history / --no-field-history
+    export_dir: history_export  # directory for JSON output files
+
+  # ----------------------------------------------------------
+  # Activity History (Task + Event)
+  # ----------------------------------------------------------
+  # Tasks and Events CAN be inserted via the API.
+  # WhatId (relates to Account, Opportunity, Case, custom objects, etc.)
+  # and WhoId (relates to Contact or Lead) are resolved from the
+  # source→target Id maps built during parent record migration.
+  #
+  # Set migrate_activity_history: true on each object below to opt in.
+  # ----------------------------------------------------------
+  activity_history:
+    enabled: false              # master switch; also --activity-history / --no-activity-history
+    include_tasks: true         # migrate Task records
+    include_events: true        # migrate Event records
+    record_limit:               # separate cap for activity records (blank = use global limit)
 
   objects:
 
@@ -34,20 +65,27 @@ migration:
       skip_fields:
         - Fax
         - NumberOfEmployees
-      lookup_key: Name           # field used to find matching target record
-      where_clause: ""           # optional SOQL WHERE (omit quotes around clause)
-      record_limit:              # per-object limit (overrides global); blank = use global
+      lookup_key: Name
+      where_clause: ""
+      record_limit:             # per-object limit (blank = use global)
+      migrate_field_history: true    # export AccountHistory rows to JSON
+      migrate_activity_history: true # migrate Tasks/Events with WhatId = this Account
+
       children:
         - api_name: Contact
-          parent_field: AccountId  # FK on Contact pointing to Account
-          lookup_key: Email        # must be unique enough to identify a Contact
+          parent_field: AccountId
+          lookup_key: Email
           skip_fields:
             - OtherPhone
+          migrate_field_history: true    # export ContactHistory
+          migrate_activity_history: true # WhoId resolution for Contact Tasks/Events
 
         - api_name: Opportunity
           parent_field: AccountId
           lookup_key: Name
           skip_fields: []
+          migrate_field_history: true
+          migrate_activity_history: true
 
     # ----------------------------------------------------------
     # Example 2: Custom object — specific fields only
@@ -62,16 +100,21 @@ migration:
       skip_fields: []
       lookup_key: Name
       where_clause: "Status__c != 'Archived'"
-      record_limit: 500          # only migrate up to 500 Project records
+      record_limit: 500
+      migrate_field_history: true
+      migrate_activity_history: false   # no activities on this object
+
       children:
         - api_name: Project_Task__c
           parent_field: Project__c
           lookup_key: Name
           skip_fields:
             - Legacy_Notes__c
+          migrate_field_history: false
+          migrate_activity_history: false
 
     # ----------------------------------------------------------
-    # Example 3: Case — no children
+    # Example 3: Case — no children, history on
     # ----------------------------------------------------------
     - api_name: Case
       skip_fields:
@@ -79,4 +122,6 @@ migration:
         - SuppliedName
       lookup_key: CaseNumber
       where_clause: "IsClosed = false"
+      migrate_field_history: true
+      migrate_activity_history: true
       children: []
