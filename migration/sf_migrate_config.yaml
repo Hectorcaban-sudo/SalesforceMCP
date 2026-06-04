@@ -1,0 +1,82 @@
+# ============================================================
+# Salesforce Sandbox Migration Config
+# ============================================================
+# Run:  python sf_migrate.py --config sf_migrate_config.yaml
+# Dry:  python sf_migrate.py --config sf_migrate_config.yaml --dry-run
+# ============================================================
+
+source:
+  username: user@source.sandbox.com
+  password: SourcePassword123
+  security_token: abc123SourceToken
+  domain: test                  # 'test' = sandbox | 'login' = production
+
+target:
+  username: user@target.sandbox.com
+  password: TargetPassword123
+  security_token: xyz789TargetToken
+  domain: test
+
+migration:
+  batch_size: 200               # records per API call batch
+  dry_run: false                # true = read-only planning mode; no writes
+  include_children: true        # set false to skip all child objects
+  record_limit:                 # global max records per object — leave blank for unlimited
+                                # overridden per-object below; also overridden by --limit CLI flag
+
+  objects:
+
+    # ----------------------------------------------------------
+    # Example 1: Account — all fields except Fax
+    # ----------------------------------------------------------
+    - api_name: Account
+      # fields: omitted → all writable, non-system fields are used
+      skip_fields:
+        - Fax
+        - NumberOfEmployees
+      lookup_key: Name           # field used to find matching target record
+      where_clause: ""           # optional SOQL WHERE (omit quotes around clause)
+      record_limit:              # per-object limit (overrides global); blank = use global
+      children:
+        - api_name: Contact
+          parent_field: AccountId  # FK on Contact pointing to Account
+          lookup_key: Email        # must be unique enough to identify a Contact
+          skip_fields:
+            - OtherPhone
+
+        - api_name: Opportunity
+          parent_field: AccountId
+          lookup_key: Name
+          skip_fields: []
+
+    # ----------------------------------------------------------
+    # Example 2: Custom object — specific fields only
+    # ----------------------------------------------------------
+    - api_name: Project__c
+      fields:
+        - Name
+        - Status__c
+        - Start_Date__c
+        - End_Date__c
+        - Budget__c
+      skip_fields: []
+      lookup_key: Name
+      where_clause: "Status__c != 'Archived'"
+      record_limit: 500          # only migrate up to 500 Project records
+      children:
+        - api_name: Project_Task__c
+          parent_field: Project__c
+          lookup_key: Name
+          skip_fields:
+            - Legacy_Notes__c
+
+    # ----------------------------------------------------------
+    # Example 3: Case — no children
+    # ----------------------------------------------------------
+    - api_name: Case
+      skip_fields:
+        - SuppliedEmail
+        - SuppliedName
+      lookup_key: CaseNumber
+      where_clause: "IsClosed = false"
+      children: []
