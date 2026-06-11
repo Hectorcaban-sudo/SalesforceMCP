@@ -1,0 +1,45 @@
+openapi: 3.0.3
+info:
+  title: Document Chunk Ingestion API
+  description: Schema for ingesting pre-chunked document content into Data 360 for RAG with Agentforce
+  version: 1.0.0
+components:
+  schemas:
+    DocumentChunk:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+          description: Unique identifier for the chunk (primary key)
+        document_id:
+          type: string
+          description: Identifier of the parent document
+        document_title:
+          type: string
+          description: Title of the source document
+        chunk_sequence:
+          type: number
+          description: Position of this chunk within the document
+        content:
+          type: string
+          description: The chunk text to be indexed and vectorized
+        source_url:
+          type: string
+          description: Link back to the original document
+        author:
+          type: string
+          description: Document author or owner
+        category:
+          type: string
+          description: Business category or tag for filtering
+        language:
+          type: string
+          description: ISO language code of the content
+        modified_date:
+          type: string
+          format: date-time
+          description: Last modified timestamp of the source document
+        ingested_date:
+          type: string
+          format: date-time
+          description: Timestamp when the chunk was sent to Data 360
