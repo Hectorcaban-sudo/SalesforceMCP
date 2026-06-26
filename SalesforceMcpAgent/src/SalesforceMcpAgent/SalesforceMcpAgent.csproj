@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SalesforceMcpAgent</RootNamespace>
+    <AssemblyName>SalesforceMcpAgent</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    Microsoft Agent Framework packages (preview).
+    Use "dotnet add package <name> - -prerelease" if a stable version isn't yet published.
+  -->
+  <ItemGroup>
+    <!-- Core Agent Framework -->
+    <PackageReference Include="Microsoft.Agents.AI"          Version="1.0.0-preview.*" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI"   Version="1.0.0-preview.*" />
+
+    <!-- MCP C# SDK – client + HTTP/SSE transports -->
+    <PackageReference Include="ModelContextProtocol"                 Version="0.*" />
+    <PackageReference Include="ModelContextProtocol.HttpClient"      Version="0.*" />
+
+    <!-- OpenAI / Azure OpenAI plumbing -->
+    <PackageReference Include="Azure.AI.OpenAI"   Version="2.*" />
+    <PackageReference Include="Azure.Identity"     Version="1.*" />
+
+    <!-- Configuration & DI -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json"         Version="9.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting"                    Version="9.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console"            Version="9.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

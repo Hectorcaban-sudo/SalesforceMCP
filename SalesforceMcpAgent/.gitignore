@@ -1,0 +1,11 @@
+## Secrets – never commit these
+appsettings.local.json
+*.user
+
+## Build output
+bin/
+obj/
+
+## OS
+.DS_Store
+Thumbs.db
