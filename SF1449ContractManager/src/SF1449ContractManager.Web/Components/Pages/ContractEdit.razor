@@ -1,0 +1,231 @@
+@page "/contracts/new"
+@page "/contracts/{Id:int}/edit"
+@rendermode InteractiveServer
+@inject IContractRepository Repository
+@inject NavigationManager Nav
+
+<h1>@(IsNew ? "New Contract Record" : $"Edit Contract {_model.ContractNumber}")</h1>
+
+<EditForm Model="_model" OnValidSubmit="Save" class="entry-form">
+    <DataAnnotationsValidator />
+
+    <fieldset>
+        <legend>Identification (Blocks 1-8)</legend>
+        <div class="entry-grid">
+            <div class="form-field"><label>Requisition # (Blk 1)</label><InputText @bind-Value="_model.RequisitionNumber" /></div>
+            <div class="form-field"><label>Contract # (Blk 2)</label><InputText @bind-Value="_model.ContractNumber" /></div>
+            <div class="form-field"><label>Award/Effective Date (Blk 3)</label><InputDate @bind-Value="_model.AwardEffectiveDate" /></div>
+            <div class="form-field"><label>Order # (Blk 4)</label><InputText @bind-Value="_model.OrderNumber" /></div>
+            <div class="form-field"><label>Solicitation # (Blk 5)</label><InputText @bind-Value="_model.SolicitationNumber" /></div>
+            <div class="form-field"><label>Solicitation Issue Date (Blk 6)</label><InputDate @bind-Value="_model.SolicitationIssueDate" /></div>
+            <div class="form-field"><label>Contact Name (Blk 7a)</label><InputText @bind-Value="_model.SolicitationContactName" /></div>
+            <div class="form-field"><label>Contact Phone (Blk 7b)</label><InputText @bind-Value="_model.SolicitationContactPhone" /></div>
+            <div class="form-field"><label>Offer Due Date/Time (Blk 8)</label><InputDate Type="InputDateType.DateTimeLocal" @bind-Value="_model.OfferDueDateLocalTime" /></div>
+            <div class="form-field"><label>Title</label><InputText @bind-Value="_model.Title" /></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Issued By (Block 9)</legend>
+        <div class="entry-grid">
+            <div class="form-field"><label>Code</label><InputText @bind-Value="_model.IssuedByCode" /></div>
+            <div class="form-field"><label>Office Name</label><InputText @bind-Value="_model.IssuedByName" /></div>
+            <div class="form-field"><label>Contact Email</label><InputText @bind-Value="_model.IssuedByContactEmail" /></div>
+            <div class="form-field" style="grid-column: span 3;"><label>Address</label><InputTextArea @bind-Value="_model.IssuedByAddress" /></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Set-Aside / NAICS (Block 10)</legend>
+        <div class="entry-grid">
+            <div class="form-field">
+                <label>Acquisition Type</label>
+                <InputSelect @bind-Value="_model.AcquisitionType">
+                    <option value="Unrestricted">Unrestricted</option>
+                    <option value="SetAside">Set-Aside</option>
+                </InputSelect>
+            </div>
+            <div class="form-field"><label>Set-Aside % For</label><InputNumber @bind-Value="_model.SetAsidePercent" /></div>
+            <div class="form-field"><label>NAICS Code</label><InputText @bind-Value="_model.NaicsCode" /></div>
+            <div class="form-field"><label>Size Standard (USD)</label><InputNumber @bind-Value="_model.SizeStandardUsd" /></div>
+            <div class="checkbox-field"><InputCheckbox @bind-Value="_model.IsSmallBusiness" /> <label>Small Business</label></div>
+            <div class="checkbox-field"><InputCheckbox @bind-Value="_model.IsHubZoneSmallBusiness" /> <label>HUBZone</label></div>
+            <div class="checkbox-field"><InputCheckbox @bind-Value="_model.IsServiceDisabledVeteranOwned" /> <label>SDVOSB</label></div>
+            <div class="checkbox-field"><InputCheckbox @bind-Value="_model.IsWomenOwnedSmallBusiness" /> <label>WOSB</label></div>
+            <div class="checkbox-field"><InputCheckbox @bind-Value="_model.IsEconomicallyDisadvantagedWomenOwned" /> <label>EDWOSB</label></div>
+            <div class="checkbox-field"><InputCheckbox @bind-Value="_model.Is8A" /> <label>8(a)</label></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Delivery, Ratings &amp; Method (Blocks 11-16)</legend>
+        <div class="entry-grid">
+            <div class="form-field"><label>Discount Terms (Blk 12)</label><InputText @bind-Value="_model.DiscountTerms" /></div>
+            <div class="form-field"><label>DPAS Rating (Blk 13b)</label><InputText @bind-Value="_model.DpasRating" /></div>
+            <div class="form-field">
+                <label>Method of Solicitation (Blk 14)</label>
+                <InputSelect @bind-Value="_model.MethodOfSolicitation">
+                    <option value="Unspecified">-</option>
+                    <option value="RequestForQuote">RFQ</option>
+                    <option value="InvitationForBid">IFB</option>
+                    <option value="RequestForProposal">RFP</option>
+                </InputSelect>
+            </div>
+            <div class="form-field" style="grid-column: span 3;"><label>Deliver To Address (Blk 15)</label><InputTextArea @bind-Value="_model.DeliverToAddress" /></div>
+            <div class="form-field" style="grid-column: span 3;"><label>Administered By Address (Blk 16)</label><InputTextArea @bind-Value="_model.AdministeredByAddress" /></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Contractor / Offeror (Block 17)</legend>
+        <div class="entry-grid">
+            <div class="form-field"><label>CAGE Code</label><InputText @bind-Value="_model.ContractorCode" /></div>
+            <div class="form-field"><label>Facility Code</label><InputText @bind-Value="_model.ContractorFacilityCode" /></div>
+            <div class="form-field"><label>Contractor Name</label><InputText @bind-Value="_model.ContractorName" /></div>
+            <div class="form-field" style="grid-column: span 2;"><label>Contractor Address</label><InputTextArea @bind-Value="_model.ContractorAddress" /></div>
+            <div class="form-field"><label>Contractor Phone</label><InputText @bind-Value="_model.ContractorPhone" /></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Payment (Block 18) &amp; Award (Blocks 25-26)</legend>
+        <div class="entry-grid">
+            <div class="form-field"><label>Payment Office Code (18a)</label><InputText @bind-Value="_model.PaymentWillBeMadeByCode" /></div>
+            <div class="form-field" style="grid-column: span 2;"><label>Payment Office Address</label><InputTextArea @bind-Value="_model.PaymentWillBeMadeByAddress" /></div>
+            <div class="form-field" style="grid-column: span 2;"><label>Accounting &amp; Appropriation Data (Blk 25)</label><InputTextArea @bind-Value="_model.AccountingAndAppropriationData" /></div>
+            <div class="form-field"><label>Total Award Amount (Blk 26)</label><InputNumber @bind-Value="_model.TotalAwardAmount" /></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Signatures (Blocks 30-31)</legend>
+        <div class="entry-grid two-col">
+            <div class="form-field"><label>Offeror Signer Name/Title (30b)</label><InputText @bind-Value="_model.OfferorSignerNameAndTitle" /></div>
+            <div class="form-field"><label>Offeror Signed Date (30c)</label><InputDate @bind-Value="_model.OfferorSignedDate" /></div>
+            <div class="form-field"><label>Contracting Officer Name (31b)</label><InputText @bind-Value="_model.ContractingOfficerName" /></div>
+            <div class="form-field"><label>CO Signed Date (31c)</label><InputDate @bind-Value="_model.ContractingOfficerSignedDate" /></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Schedule of Supplies/Services (Blocks 19-24)</legend>
+        <table class="line-items-table">
+            <thead>
+                <tr><th>Item #</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var li in _model.LineItems)
+                {
+                    <tr>
+                        <td><input @bind="li.ItemNumber" /></td>
+                        <td><input @bind="li.Description" /></td>
+                        <td><input type="number" step="0.01" @bind="li.Quantity" /></td>
+                        <td><input @bind="li.Unit" /></td>
+                        <td><input type="number" step="0.01" @bind="li.UnitPrice" /></td>
+                        <td><input type="number" step="0.01" @bind="li.Amount" /></td>
+                        <td><button type="button" class="btn btn-small btn-danger" @onclick="() => RemoveLineItem(li)">✕</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div style="padding: 0 1rem;"><button type="button" class="btn btn-small btn-secondary" @onclick="AddLineItem">+ Add line item</button></div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Clauses &amp; Provisions</legend>
+        <table class="clauses-table">
+            <thead>
+                <tr><th>Number</th><th>Title</th><th>Category</th><th>Type</th><th>Section</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var cl in _model.Clauses)
+                {
+                    <tr>
+                        <td><input @bind="cl.ClauseNumber" /></td>
+                        <td><input @bind="cl.Title" /></td>
+                        <td>
+                            <select @bind="cl.Category">
+                                <option value="FAR">FAR</option>
+                                <option value="DFARS">DFARS</option>
+                                <option value="Agency">Agency</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select @bind="cl.IncorporationType">
+                                <option value="ByReference">By Reference</option>
+                                <option value="FullText">Full Text</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select @bind="cl.Section">
+                                <option value="ContractClauses">Contract Clauses</option>
+                                <option value="AddendumToContractClauses">Addendum to Contract Clauses</option>
+                                <option value="SolicitationProvisions">Solicitation Provisions</option>
+                                <option value="AddendumToSolicitationProvisions">Addendum to Solicitation Provisions</option>
+                                <option value="OfferorRepresentationsAndCertifications">Offeror Reps &amp; Certs</option>
+                            </select>
+                        </td>
+                        <td><button type="button" class="btn btn-small btn-danger" @onclick="() => RemoveClause(cl)">✕</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div style="padding: 0 1rem;"><button type="button" class="btn btn-small btn-secondary" @onclick="AddClause">+ Add clause</button></div>
+    </fieldset>
+
+    <div class="toolbar">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a class="btn btn-secondary" href="/">Cancel</a>
+        @if (!IsNew)
+        {
+            <button type="button" class="btn btn-danger" @onclick="Delete">Delete Record</button>
+        }
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsNew => Id is null or 0;
+    private Sf1449Contract _model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            var existing = await Repository.GetByIdAsync(Id!.Value);
+            if (existing is not null) _model = existing;
+        }
+    }
+
+    private void AddLineItem() => _model.LineItems.Add(new ContractLineItem { SortOrder = _model.LineItems.Count });
+    private void RemoveLineItem(ContractLineItem li) => _model.LineItems.Remove(li);
+
+    private void AddClause() => _model.Clauses.Add(new ContractClause { ClauseNumber = string.Empty });
+    private void RemoveClause(ContractClause cl) => _model.Clauses.Remove(cl);
+
+    private async Task Save()
+    {
+        if (IsNew)
+        {
+            _model.Status = ContractStatus.Draft;
+            var saved = await Repository.AddAsync(_model);
+            Nav.NavigateTo($"contracts/{saved.Id}/edit");
+        }
+        else
+        {
+            await Repository.UpdateAsync(_model);
+            Nav.NavigateTo("/");
+        }
+    }
+
+    private async Task Delete()
+    {
+        if (!IsNew)
+        {
+            await Repository.DeleteAsync(_model.Id);
+            Nav.NavigateTo("/");
+        }
+    }
+}

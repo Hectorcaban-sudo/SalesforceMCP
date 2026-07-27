@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SF1449ContractManager.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Microsoft Agent Framework - the extraction agent is a thin AIAgent wrapper -->
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.14.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.14.0" />
+
+    <!-- EF Core persistence (SQLite by default; swap provider for SQL Server/Postgres in prod) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+
+    <!-- Pure-managed PDF text extraction, no native deps -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

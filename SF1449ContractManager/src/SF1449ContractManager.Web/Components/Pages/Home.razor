@@ -1,0 +1,132 @@
+@page "/"
+@rendermode InteractiveServer
+@using SF1449ContractManager.Core.Extraction
+@inject IContractRepository Repository
+@inject IContractExtractionAgent ExtractionAgent
+@inject PdfTextExtractor PdfExtractor
+@inject NavigationManager Nav
+@inject IWebHostEnvironment Env
+
+<h1>Contracts</h1>
+
+<div class="upload-box">
+    @if (_isExtracting)
+    {
+        <p><strong>Scanning @_uploadingFileName ...</strong></p>
+        <p>Reading the PDF and running the AI extraction agent. This can take up to a minute for long solicitations.</p>
+    }
+    else
+    {
+        <p><strong>Scan a fully-executed SF-1449 PDF</strong></p>
+        <p>Upload a contract PDF (like <code>W912WJ25QA026.pdf</code>) to automatically extract header fields, CLINs, and clauses.</p>
+        <InputFile OnChange="OnFileSelected" accept="application/pdf" />
+    }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <p style="color:#dc2626"><strong>@_error</strong></p>
+    }
+</div>
+
+<div class="toolbar">
+    <a class="btn btn-secondary" href="contracts/new">+ Add record manually</a>
+</div>
+
+@if (_contracts is null)
+{
+    <p>Loading...</p>
+}
+else if (_contracts.Count == 0)
+{
+    <p>No contracts yet. Upload a PDF above or add one manually.</p>
+}
+else
+{
+    <table class="contract-table">
+        <thead>
+            <tr>
+                <th>Contract #</th>
+                <th>Solicitation #</th>
+                <th>Contractor</th>
+                <th>Title</th>
+                <th>Total Award</th>
+                <th>Status</th>
+                <th>Uploaded</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in _contracts)
+            {
+                <tr>
+                    <td>@c.ContractNumber</td>
+                    <td>@c.SolicitationNumber</td>
+                    <td>@c.ContractorName</td>
+                    <td>@c.Title</td>
+                    <td>@(c.TotalAwardAmount?.ToString("C") ?? "-")</td>
+                    <td><span class="badge badge-@c.Status.ToString().ToLowerInvariant()">@c.Status</span></td>
+                    <td>@c.CreatedAtUtc.ToLocalTime().ToString("g")</td>
+                    <td>
+                        <a class="btn btn-small btn-secondary" href="contracts/@c.Id/review">Review</a>
+                        <a class="btn btn-small btn-secondary" href="contracts/@c.Id/edit">Edit</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Sf1449Contract>? _contracts;
+    private bool _isExtracting;
+    private string? _uploadingFileName;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _contracts = await Repository.GetAllAsync();
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        var file = e.File;
+        if (file is null) return;
+
+        _isExtracting = true;
+        _uploadingFileName = file.Name;
+        StateHasChanged();
+
+        try
+        {
+            var uploadsDir = Path.Combine(Env.WebRootPath, "uploads");
+            Directory.CreateDirectory(uploadsDir);
+            var storedName = $"{Guid.NewGuid():N}_{file.Name}";
+            var storedPath = Path.Combine(uploadsDir, storedName);
+
+            await using (var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024))
+            await using (var fileStream = File.Create(storedPath))
+            {
+                await stream.CopyToAsync(fileStream);
+            }
+
+            var pages = PdfExtractor.ExtractPages(storedPath);
+            var taggedText = PdfExtractor.BuildTaggedFullText(pages);
+
+            var outcome = await ExtractionAgent.ExtractAsync(taggedText, file.Name);
+            outcome.Contract.SourcePdfStoragePath = $"/uploads/{storedName}";
+            outcome.Contract.PageCount = pages.Count;
+
+            var saved = await Repository.AddAsync(outcome.Contract);
+
+            Nav.NavigateTo($"contracts/{saved.Id}/review");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Extraction failed: {ex.Message}";
+        }
+        finally
+        {
+            _isExtracting = false;
+        }
+    }
+}

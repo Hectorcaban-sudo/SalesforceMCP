@@ -1,0 +1,203 @@
+@page "/contracts/{Id:int}/review"
+@rendermode InteractiveServer
+@inject IContractRepository Repository
+@inject IJSRuntime JS
+
+<h1>Review Scanned Contract</h1>
+
+@if (_contract is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="toolbar">
+        <span class="badge badge-@_contract.Status.ToString().ToLowerInvariant()">@_contract.Status</span>
+        <span>Source: <strong>@_contract.SourcePdfFileName</strong> (@_contract.PageCount pages)</span>
+        <button class="btn btn-primary" @onclick="ApproveAndSave">Approve &amp; Save</button>
+        <a class="btn btn-secondary" href="contracts/@_contract.Id/edit">Open full data-entry form</a>
+        <a class="btn btn-secondary" href="/">Back to list</a>
+    </div>
+
+    <div class="review-shell">
+        <div class="review-pdf-pane">
+            <iframe id="pdfFrame" src="@PdfSrc"></iframe>
+        </div>
+
+        <div class="review-fields-pane">
+            @foreach (var group in FieldGroups)
+            {
+                <div class="field-section">
+                    <h3>@group.Title</h3>
+                    @foreach (var fieldName in group.FieldNames)
+                    {
+                        var extraction = FieldFor(fieldName);
+                        <div class="field-row @HighlightClass(extraction)">
+                            <label>@LabelFor(fieldName, extraction)</label>
+                            <input type="text" value="@GetValue(fieldName)" @onchange="e => SetValue(fieldName, e.Value?.ToString())" />
+                            <div style="display:flex; align-items:center; gap:.35rem;">
+                                @if (extraction is not null)
+                                {
+                                    <span class="confidence-chip @extraction.Level.ToString().ToLowerInvariant()">@((extraction.Confidence * 100).ToString("0"))%</span>
+                                    @if (extraction.SourcePageNumber is not null)
+                                    {
+                                        <button class="page-jump-btn" @onclick="() => JumpToPage(extraction.SourcePageNumber!.Value)">p.@extraction.SourcePageNumber</button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="field-section">
+                <h3>Schedule of Supplies/Services (Blocks 19-24)</h3>
+                <table class="line-items-table">
+                    <thead>
+                        <tr><th>Item #</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var li in _contract.LineItems)
+                        {
+                            <tr>
+                                <td>@li.ItemNumber</td>
+                                <td>@li.Description</td>
+                                <td>@li.Quantity</td>
+                                <td>@li.Unit</td>
+                                <td>@li.UnitPrice?.ToString("C")</td>
+                                <td>@li.Amount?.ToString("C")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="field-section">
+                <h3>Clauses &amp; Provisions (@_contract.Clauses.Count found)</h3>
+                <table class="clauses-table">
+                    <thead>
+                        <tr><th>Number</th><th>Title</th><th>Category</th><th>Type</th><th>Section</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cl in _contract.Clauses.OrderBy(c => c.Section).ThenBy(c => c.ClauseNumber))
+                        {
+                            <tr>
+                                <td>@cl.ClauseNumber</td>
+                                <td>@cl.Title</td>
+                                <td>@cl.Category</td>
+                                <td>@cl.IncorporationType</td>
+                                <td>@cl.Section</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Sf1449Contract? _contract;
+    private int _currentPage = 1;
+
+    private record FieldGroup(string Title, string[] FieldNames);
+
+    private static readonly FieldGroup[] FieldGroups =
+    {
+        new("Identification (Blocks 1-8)", new[]
+        {
+            nameof(Sf1449Contract.RequisitionNumber), nameof(Sf1449Contract.ContractNumber),
+            nameof(Sf1449Contract.AwardEffectiveDate), nameof(Sf1449Contract.OrderNumber),
+            nameof(Sf1449Contract.SolicitationNumber), nameof(Sf1449Contract.SolicitationIssueDate),
+            nameof(Sf1449Contract.SolicitationContactName), nameof(Sf1449Contract.SolicitationContactPhone),
+            nameof(Sf1449Contract.OfferDueDateLocalTime)
+        }),
+        new("Issued By (Block 9)", new[]
+        {
+            nameof(Sf1449Contract.IssuedByCode), nameof(Sf1449Contract.IssuedByName),
+            nameof(Sf1449Contract.IssuedByAddress)
+        }),
+        new("Set-Aside / NAICS (Block 10)", new[]
+        {
+            nameof(Sf1449Contract.NaicsCode), nameof(Sf1449Contract.SizeStandardUsd),
+            nameof(Sf1449Contract.SetAsidePercent)
+        }),
+        new("Contractor / Payment (Blocks 17-18)", new[]
+        {
+            nameof(Sf1449Contract.ContractorCode), nameof(Sf1449Contract.ContractorName),
+            nameof(Sf1449Contract.ContractorAddress), nameof(Sf1449Contract.ContractorPhone),
+            nameof(Sf1449Contract.PaymentWillBeMadeByCode)
+        }),
+        new("Award (Blocks 25-31)", new[]
+        {
+            nameof(Sf1449Contract.AccountingAndAppropriationData), nameof(Sf1449Contract.TotalAwardAmount),
+            nameof(Sf1449Contract.ContractingOfficerName), nameof(Sf1449Contract.ContractingOfficerSignedDate)
+        }),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _contract = await Repository.GetByIdAsync(Id);
+    }
+
+    private string PdfSrc => _contract?.SourcePdfStoragePath is { } path
+        ? $"{path}#page={_currentPage}"
+        : "about:blank";
+
+    private FieldExtraction? FieldFor(string fieldName) =>
+        _contract?.FieldExtractions.FirstOrDefault(f => f.FieldName == fieldName);
+
+    private string LabelFor(string fieldName, FieldExtraction? extraction) =>
+        extraction?.DisplayLabel ?? fieldName;
+
+    private string HighlightClass(FieldExtraction? extraction) => extraction is null
+        ? ""
+        : "field-highlight-" + extraction.Level.ToString().ToLowerInvariant();
+
+    private string GetValue(string fieldName)
+    {
+        var prop = typeof(Sf1449Contract).GetProperty(fieldName);
+        var value = prop?.GetValue(_contract);
+        return value?.ToString() ?? string.Empty;
+    }
+
+    private void SetValue(string fieldName, string? value)
+    {
+        if (_contract is null) return;
+        var prop = typeof(Sf1449Contract).GetProperty(fieldName);
+        if (prop is null || !prop.CanWrite) return;
+
+        try
+        {
+            var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+            object? converted = string.IsNullOrWhiteSpace(value)
+                ? null
+                : Convert.ChangeType(value, targetType);
+            prop.SetValue(_contract, converted);
+
+            var extraction = FieldFor(fieldName);
+            if (extraction is not null) extraction.ReviewedByUser = true;
+        }
+        catch
+        {
+            // Ignore un-parseable manual edits here; the full data-entry form has
+            // proper typed inputs (date pickers, checkboxes, dropdowns) for
+            // fields that need stricter validation.
+        }
+    }
+
+    private async Task JumpToPage(int page)
+    {
+        _currentPage = page;
+        await JS.InvokeVoidAsync("eval", $"document.getElementById('pdfFrame').src = '{PdfSrc}';");
+    }
+
+    private async Task ApproveAndSave()
+    {
+        if (_contract is null) return;
+        _contract.Status = ContractStatus.Reviewed;
+        await Repository.UpdateAsync(_contract);
+    }
+}
