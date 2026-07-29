@@ -4,6 +4,7 @@
 @inject IContractRepository Repository
 @inject IContractExtractionAgent ExtractionAgent
 @inject PdfTextExtractor PdfExtractor
+@inject FieldLocator FieldLocator
 @inject NavigationManager Nav
 @inject IWebHostEnvironment Env
 
@@ -115,6 +116,8 @@ else
             var outcome = await ExtractionAgent.ExtractAsync(taggedText, file.Name);
             outcome.Contract.SourcePdfStoragePath = $"/uploads/{storedName}";
             outcome.Contract.PageCount = pages.Count;
+
+            FieldLocator.LocateFields(outcome.Contract, pages);
 
             var saved = await Repository.AddAsync(outcome.Contract);
 

@@ -34,7 +34,7 @@ SF1449ContractManager.sln
 | Page | Route | Purpose |
 |---|---|---|
 | `Home.razor` | `/` | Contract list + PDF upload/scan. |
-| `ContractReview.razor` | `/contracts/{id}/review` | **The split-screen scan-review UI** — PDF on the left, extracted fields grouped by SF-1449 block on the right, each field highlighted green/yellow/red by confidence, with a "jump to source page" link and inline correction before you approve. |
+| `ContractReview.razor` | `/contracts/{id}/review` | **The split-screen scan-review UI** — PDF rendered via PDF.js on the left **with colored boxes drawn directly on top of the extracted text** (green/yellow/red by confidence), and the same fields grouped by SF-1449 block in a side panel on the right. Click a field in the list to jump to its page and flash its box on the PDF; click a box on the PDF to scroll/select the matching field in the list. Inline correction before you approve. |
 | `ContractEdit.razor` | `/contracts/new`, `/contracts/{id}/edit` | Full manual data-entry form: every header field, plus add/remove rows for line items and clauses. Works for both creating a new record from scratch and editing an AI-extracted one. |
 
 ## How extraction works end to end
@@ -47,8 +47,26 @@ SF1449ContractManager.sln
 4. The JSON response is deserialized and mapped by reflection onto `Sf1449Contract`,
    `ContractLineItem`, and `ContractClause`, while every header field also gets a
    `FieldExtraction` row recording confidence + source page.
-5. The contract is saved with `Status = PendingReview` and the user lands on the
+5. **`FieldLocator`** takes each field's raw extracted text + source page and searches
+   the page's actual word geometry (from PdfPig) for a matching span of words, storing
+   the result as a bounding box in *percent-of-page* coordinates. This is what lets the
+   review screen draw a highlight box in the right spot on the PDF itself, not just list
+   the field in a side panel. It's a text-matching heuristic, not OCR-perfect — some
+   fields (summaries, inferred checkboxes, values the LLM paraphrased rather than copied
+   verbatim) won't resolve to a box, and the UI falls back to "click to jump to page" for
+   those.
+6. The contract is saved with `Status = PendingReview` and the user lands on the
    review screen to confirm/correct fields before approving.
+
+### On-PDF highlighting
+
+`ContractReview.razor` renders the PDF with **PDF.js** (loaded from cdnjs at runtime —
+see `wwwroot/js/pdfHighlightViewer.js`, bump `PDFJS_VERSION` there or swap in a
+locally-hosted copy for air-gapped deployments) onto a `<canvas>`, with an absolutely
+positioned overlay `<div>` on top holding one highlight box per field that has a
+bounding box. Boxes are positioned with CSS percentages, so they stay aligned with the
+text under any zoom level. Clicking a box or a side-panel row is a two-way sync via
+JS interop (`OnHighlightClicked` is a `[JSInvokable]` callback on the component).
 
 ## Running it
 
@@ -79,7 +97,9 @@ SF1449ContractManager.sln
 
 - **NuGet package versions** in the `.csproj` files (`Microsoft.Agents.AI`, `Microsoft.Extensions.AI.OpenAI`, etc.) were current as of mid-2026 but the framework is in active preview — pin/update versions with `dotnet outdated` before shipping, and check the [Microsoft Agent Framework docs](https://learn.microsoft.com/en-us/agent-framework/) for the current `AIAgent` surface.
 - **Very large PDFs**: this sends the whole document text in a single agent call. For 100+ page solicitations, chunk by section (Header, PWS, Clauses) and issue one agent call per chunk, or use a model with a large context window.
-- **Scanned (non-text) PDFs** need an OCR pass before `PdfTextExtractor` — it does not do OCR itself.
+- **Scanned (non-text) PDFs** need an OCR pass before `PdfTextExtractor` — it does not do OCR itself (and `FieldLocator` needs the OCR engine's word boxes too, if you want on-PDF highlighting for scanned docs).
+- **`FieldLocator`'s text-matching is a heuristic**, not guaranteed — very short values, values the LLM paraphrased instead of copying verbatim, and values that span an unusual layout (e.g. a checkbox mark with no adjacent label) may not resolve to a box. Tune the matching thresholds in `FieldLocator.cs` if you see too many/few misses on your document set.
+- **`pdfHighlightViewer.js` loads PDF.js from cdnjs at runtime** — for an air-gapped/offline deployment, download the PDF.js build into `wwwroot/lib/pdfjs/` and change the `import()` URL and `workerSrc` in that file to local paths.
 - **`ContractRepository.UpdateAsync`** replaces line items/clauses wholesale on every save, which is simple and correct for a form-based UI but not efficient for very large clause lists updated frequently — switch to a diff-based update if that becomes a bottleneck.
 - **Authentication/authorization** is not included — add ASP.NET Core Identity or your org's SSO before exposing this beyond a trusted internal network, since it handles procurement-sensitive data.
 - **52.212-3 offeror representations & certifications** (the giant checkbox form) is modeled generically via `ContractClause` rows with `Section = OfferorRepresentationsAndCertifications` rather than one column per checkbox — add a dedicated `OfferorCertification` entity if you need to query/report on individual reps.

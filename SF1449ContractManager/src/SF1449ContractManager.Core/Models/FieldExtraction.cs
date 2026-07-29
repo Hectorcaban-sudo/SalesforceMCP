@@ -31,6 +31,19 @@ public class FieldExtraction
     public bool ReviewedByUser { get; set; }
     public string? ReviewerNote { get; set; }
 
+    // --- On-page location, used to draw the highlight box directly on the PDF ------------
+    // Expressed as percentages (0.0-1.0) of the source page's width/height, top-left origin,
+    // so the overlay scales with the rendered canvas regardless of zoom level. Populated by
+    // FieldLocator after extraction; null if the value's text couldn't be confidently located
+    // on the page (the field still shows in the side list either way, it just won't draw a box).
+    public double? BoxLeftPct { get; set; }
+    public double? BoxTopPct { get; set; }
+    public double? BoxWidthPct { get; set; }
+    public double? BoxHeightPct { get; set; }
+
+    public bool HasBoundingBox => BoxLeftPct is not null && BoxTopPct is not null
+        && BoxWidthPct is not null && BoxHeightPct is not null;
+
     /// <summary>Confidence bucket used purely for UI color-coding (green/yellow/red highlight).</summary>
     public FieldConfidenceLevel Level =>
         Confidence >= 0.85 ? FieldConfidenceLevel.High :

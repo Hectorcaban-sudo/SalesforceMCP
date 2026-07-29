@@ -56,6 +56,7 @@ builder.Services.AddSingleton<IChatClient>(sp =>
 
 builder.Services.AddScoped<IContractExtractionAgent, Sf1449ExtractionAgent>();
 builder.Services.AddScoped<PdfTextExtractor>();
+builder.Services.AddSingleton<FieldLocator>();
 
 var app = builder.Build();
 
