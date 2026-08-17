@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using TinyGptRag.Autograd;
 using TinyGptRag.Model;
 using TinyGptRag.Rag;
@@ -60,16 +59,13 @@ Usage:
             return dict;
         }
 
-        private static string ReadTextFileOrDirectory(string path)
+        private static List<string> ReadTextFiles(string path)
         {
             if (Directory.Exists(path))
-            {
-                var sb = new StringBuilder();
-                foreach (var f in Directory.GetFiles(path, "*.txt", SearchOption.AllDirectories))
-                    sb.AppendLine(File.ReadAllText(f));
-                return sb.ToString();
-            }
-            return File.ReadAllText(path);
+                return Directory.GetFiles(path, "*.txt", SearchOption.AllDirectories)
+                    .Select(File.ReadAllText)
+                    .ToList();
+            return new List<string> { File.ReadAllText(path) };
         }
 
         private static int CmdTrain(Dictionary<string, string> o)
@@ -94,20 +90,31 @@ Usage:
             double lr = GetDouble(o, "lr", 3e-4);
 
             Console.WriteLine("Reading corpus...");
-            string text = ReadTextFileOrDirectory(corpusPath);
-            if (string.IsNullOrWhiteSpace(text))
+            var fileTexts = ReadTextFiles(corpusPath).Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+            if (fileTexts.Count == 0)
             {
                 Console.WriteLine("Corpus is empty.");
                 return 1;
             }
+            Console.WriteLine($"Found {fileTexts.Count} file(s).");
 
             Console.WriteLine("Training tokenizer on your corpus...");
-            var tokenizer = WordTokenizer.Train(text, cfg.VocabSize);
+            var tokenizer = WordTokenizer.Train(string.Join("\n", fileTexts), cfg.VocabSize);
             cfg.VocabSize = tokenizer.VocabSize; // actual vocab may be smaller than requested
             Console.WriteLine($"Vocabulary size: {cfg.VocabSize}");
 
-            var ids = tokenizer.Encode(text);
-            Console.WriteLine($"Corpus length: {ids.Length} tokens");
+            // Encode each file separately and stitch them together with a real <eos> token
+            // in between, so the model can learn "a new, unrelated document starts here"
+            // instead of seeing an abrupt, meaningless jump in an unbroken token stream.
+            int eosId = tokenizer.TokenToId[WordTokenizer.Eos];
+            var idsList = new List<int>();
+            for (int i = 0; i < fileTexts.Count; i++)
+            {
+                idsList.AddRange(tokenizer.Encode(fileTexts[i]));
+                if (i < fileTexts.Count - 1) idsList.Add(eosId);
+            }
+            var ids = idsList.ToArray();
+            Console.WriteLine($"Corpus length: {ids.Length} tokens (including {fileTexts.Count - 1} file-boundary <eos> tokens)");
 
             Console.WriteLine("Initializing model (random weights, no pretraining)...");
             var model = new TinyGpt(cfg);
