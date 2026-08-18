@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace TinyGptRag.Autograd
 {
@@ -80,7 +81,11 @@ namespace TinyGptRag.Autograd
         {
             if (a.Cols != b.Rows) throw new InvalidOperationException($"MatMul shape mismatch {a.Rows}x{a.Cols} * {b.Rows}x{b.Cols}");
             var result = new Tensor(a.Rows, b.Cols, true);
-            for (int i = 0; i < a.Rows; i++)
+
+            // Forward: each row i of the output only depends on row i of `a`, so rows
+            // can be computed on separate threads with no shared-state conflicts.
+            Parallel.For(0, a.Rows, i =>
+            {
                 for (int k = 0; k < a.Cols; k++)
                 {
                     double av = a.Data[i, k];
@@ -88,23 +93,40 @@ namespace TinyGptRag.Autograd
                     for (int j = 0; j < b.Cols; j++)
                         result.Data[i, j] += av * b.Data[k, j];
                 }
+            });
 
             if (!NoGrad)
             {
                 result.AttachParents(a, b);
                 result.SetBackward(() =>
                 {
-                    for (int i = 0; i < a.Rows; i++)
+                    // dA: row i of a.Grad only depends on row i of result.Grad -> safe to parallelize over i.
+                    Parallel.For(0, a.Rows, i =>
+                    {
                         for (int j = 0; j < b.Cols; j++)
                         {
                             double g = result.Grad[i, j];
                             if (g == 0) continue;
                             for (int k = 0; k < a.Cols; k++)
-                            {
                                 a.Grad[i, k] += g * b.Data[k, j];
-                                b.Grad[k, j] += a.Data[i, k] * g;
-                            }
                         }
+                    });
+
+                    // dB: row k of b.Grad only depends on column k of a -> safe to parallelize over k
+                    // (kept as a separate pass from dA so no two threads ever touch the same array cell).
+                    Parallel.For(0, b.Rows, k =>
+                    {
+                        var rowGrad = new double[b.Cols];
+                        for (int i = 0; i < a.Rows; i++)
+                        {
+                            double av = a.Data[i, k];
+                            if (av == 0) continue;
+                            for (int j = 0; j < b.Cols; j++)
+                                rowGrad[j] += av * result.Grad[i, j];
+                        }
+                        for (int j = 0; j < b.Cols; j++)
+                            b.Grad[k, j] += rowGrad[j];
+                    });
                 });
             }
             return result;

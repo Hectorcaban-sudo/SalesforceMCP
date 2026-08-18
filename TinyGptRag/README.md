@@ -78,6 +78,14 @@ Rag/VectorStore.cs        - chunking, embedding, cosine-similarity retrieval
 Program.cs                - CLI: train / ingest / chat
 ```
 
+## Performance
+
+`MatMul` — the operation that dominates runtime in a transformer (every attention projection,
+attention score matrix, and feed-forward layer goes through it) — is parallelized across CPU cores
+(`Parallel.For` over output rows, both forward and backward passes). Server GC is also enabled for
+better multicore scaling. No GPU is used or required; on a multicore machine this should meaningfully
+speed up training compared to a single-threaded loop, scaling roughly with core count.
+
 ## Tuning tips
 
 - Loss should trend downward over training; if it plateaus high, try more steps, a larger corpus, or
